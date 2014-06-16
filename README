@@ -1,0 +1,23 @@
+cluster_prot
+============
+
+Python utility to detect protein clusters within MD simulations outputs (structure and/or trajectories)
+
+usage
+-----
+python cluster_prot.py --help
+
+requirements
+------------
+The following Python modules are needed:
+- MDAnalysis
+- scikit-learn (for DBSCAN implementation)
+
+features
+--------
+- user defined or automatic identification of proteins
+- time evolution of protein clusters
+- definition of size groups 
+- statistics
+- 1D and 2D graphs of proteins clustering
+- output files for visualisation in VMD
