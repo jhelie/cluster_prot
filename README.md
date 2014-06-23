@@ -16,10 +16,17 @@ The following Python modules are needed:
 - scikit-learn (for DBSCAN implementation)
 
 features
---------
+-----------
 - user defined or automatic identification of proteins
 - time evolution of protein clusters
 - definition of size groups 
 - statistics
 - 1D and 2D graphs of proteins clustering
 - output files for visualisation in VMD
+
+to do
+-------
+- check for clusters to be TM
+- store info about interfacial peptides on lower and upper leaflets (particularly interesting for translocating peptides in large systems....)
+
+
