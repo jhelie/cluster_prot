@@ -47,14 +47,14 @@ MDAnalysis.core.flags['use_KDTree_routines'] = False
 
 #create parser
 #=============
-version_nb="0.1.0"
-parser = argparse.ArgumentParser(prog='cluster_lip', usage='', add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description=\
+version_nb="0.1.2"
+parser = argparse.ArgumentParser(prog='cluster_prot', usage='', add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description=\
 '''
-***********************************************
+*******************************************
 v''' + version_nb + '''
 author: Jean Helie
-git: https://github.com/jhelie/cluster_prot.git
-***********************************************
+git: https://github.com/jhelie/cluster_prot
+*******************************************
 	
 [ Description ]
 
@@ -2067,12 +2067,12 @@ if args.xtcfilename=="no":
 	else:
 		tmp_groups=detect_clusters_density(get_distances(U.trajectory.ts.dimensions), U.dimensions)
 	
-	#case: store cluster size only for each lipd
+	#case: store cluster size only for each protein
 	if args.cluster_groups_file=="no":
 		for g in tmp_groups:
 			for p_index in g:
 				proteins_cluster_size[p_index].append(numpy.size(g))
-	#case: store cluster size and group size for each lipd
+	#case: store cluster size and group size for each protein
 	else:
 		for g in tmp_groups:
 			for p_index in g:
