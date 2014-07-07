@@ -24,9 +24,10 @@ features
 - 1D and 2D graphs of proteins clustering
 - output files for visualisation in VMD
 
-to do
--------
-- check for clusters to be TM
-- store info about interfacial peptides on lower and upper leaflets (particularly interesting for translocating peptides in large systems....)
+To do
+-----
+- calculate_statistics
+- plotting
+- gro case
 
 
