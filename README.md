@@ -26,8 +26,6 @@ features
 
 To do
 -----
-- calculate_statistics
 - plotting
-- gro case
 
 
