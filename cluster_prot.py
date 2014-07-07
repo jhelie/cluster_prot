@@ -12,7 +12,7 @@ import os.path
 #=========================================================================================
 # create parser
 #=========================================================================================
-version_nb = "0.1.2-dev1"
+version_nb = "0.1.2-dev2"
 parser = argparse.ArgumentParser(prog='cluster_prot', usage='', add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description=\
 '''
 **********************************************
@@ -29,6 +29,12 @@ It produces 3 outputs ((a) and (b) require --groups to be specified, see note 5)
  (a) 2D plots: time evolution of the cluster size each protein is involved in
  (b) 1D plots: time evolution of the % of protein represented by each group
  (c) stability statistics: max nb of consecutive frames each group existed for
+
+The metrics can be calculated for a single frame or for an entire trajectory - and in case
+a trajectory is supplied the data for individual frame snapshots can also be produced at a
+frequency specified by the option -w (if you don't specify an argument to -w snapshots
+will only be written for the first and last frame). Note that writing files to disk will
+considerably slow down the execution of the script.
 
 Detection of transmembrane protein clusters
 -------------------------------------------
@@ -177,6 +183,7 @@ Option	      Default  	Description
 -b			: beginning time (ns)
 -e			: ending time (ns)	
 -t 		10	: process every t-frames
+-w			: write snapshots every [w] processed frames (see 'DESCRIPTION')
 --smooth		: nb of points to use for data smoothing
 
 Lipids identification (see note 2)
@@ -208,6 +215,7 @@ parser.add_argument('-o', nargs=1, dest='output_folder', default=['no'], help=ar
 parser.add_argument('-b', nargs=1, dest='t_start', default=[-1], type=int, help=argparse.SUPPRESS)
 parser.add_argument('-e', nargs=1, dest='t_end', default=[10000000000000], type=int, help=argparse.SUPPRESS)
 parser.add_argument('-t', nargs=1, dest='frames_dt', default=[10], type=int, help=argparse.SUPPRESS)
+parser.add_argument('-w', nargs='?', dest='frames_write_dt', const=1000000000000000, default="no", help=argparse.SUPPRESS)
 parser.add_argument('--smooth', nargs=1, dest='nb_smoothing', default=[0], type=int, help=argparse.SUPPRESS)
 
 #lipids identification
@@ -242,7 +250,8 @@ args.output_folder = args.output_folder[0]
 args.t_start=args.t_start[0]
 args.t_end=args.t_end[0]
 args.frames_dt=args.frames_dt[0]
-args.frames_write_dt=args.frames_write_dt[0]
+if args.frames_write_dt != "no":
+	args.frames_write_dt = int(args.frames_write_dt)
 args.nb_smoothing = args.nb_smoothing[0]
 #lipids identification
 args.beadsfilename = args.beadsfilename[0]
@@ -550,6 +559,12 @@ def load_MDA_universe():												#DONE
 		frames_to_process = map(lambda f:f_start + args.frames_dt*f, range(0,(nb_frames_xtc - f_start)//args.frames_dt+tmp_offset))
 		nb_frames_to_process = len(frames_to_process)
 			
+		#create list of frames to write
+		if args.frames_write_dt == "no":
+			frames_to_write = [False for f_index in range(0, nb_frames_to_process)]
+		else:
+			frames_to_write = [True if (f_index % args.frames_write_dt == 0 or f_index == (nb_frames_xtc - f_start)//args.frames_dt) else False for f_index in range(0, nb_frames_to_process)]
+
 	#check for the presence of proteins
 	test_prot = U.selectAtoms("proteins")
 	if test_prot.numberOfAtoms() == 0:
@@ -912,23 +927,24 @@ def initialise_groups():									#DONE
 			for g_index in range(0, groups_number):
 				colours_groups[g_index] = groups_colors_value[g_index]
 				colours_groups_list.append(groups_colors_value[g_index])
-		
-		#add colours for the group "other", "lower" and "upper"
-		colours_groups[groups_number] = "#E6E6E6"			#other
-		colours_groups[groups_number+1] = "#808080"			#lower
-		colours_groups[groups_number+2] = "#C0C0C0"			#upper
-		
+				
 		#create label for each group
-		for g_index in range(0, groups_number+1):
-			if g_index == groups_number:
-				groups_labels[g_index] = "other"
-			elif groups_boundaries[g_index][1] == 100000:
+		for g_index in range(0, groups_number):
+			if groups_boundaries[g_index][1] == 100000:
 				groups_labels[g_index] = str(groups_boundaries[g_index][0]) + "+"
 			elif groups_boundaries[g_index][0] == groups_boundaries[g_index][1]:
 				groups_labels[g_index] = str(groups_boundaries[g_index][0])
 			else:
 				groups_labels[g_index] = str(groups_boundaries[g_index][0]) + "-" + str(groups_boundaries[g_index][1])
-	
+
+		#add colours for the group "other", "lower" and "upper"
+		colours_groups[groups_number] = "#E6E6E6"			#other
+		colours_groups[groups_number+1] = "#808080"			#lower
+		colours_groups[groups_number+2] = "#C0C0C0"			#upper
+		groups_labels[groups_number] = "other"				#other
+		groups_labels[groups_number+1] = "lower"			#lower
+		groups_labels[groups_number+2] = "upper"			#upper
+		
 	return
 
 #=========================================================================================
@@ -963,8 +979,8 @@ def data_struct_clusters():
 	if args.cluster_groups_file != "no":
 		global cluster_groups_nb
 		global cluster_groups_pc
-		cluster_groups_nb = {g_index: numpy.zeros(nb_frames_to_process) for g_index in range(0,groups_number+3}}
-		cluster_groups_pc = {g_index: numpy.zeros(nb_frames_to_process) for g_index in range(0,groups_number+3}}
+		cluster_groups_nb = {g_index: numpy.zeros(nb_frames_to_process) for g_index in range(0,groups_number+3)}
+		cluster_groups_pc = {g_index: numpy.zeros(nb_frames_to_process) for g_index in range(0,groups_number+3)}
 	
 	return
 def data_struct_proteins():
@@ -1051,7 +1067,7 @@ def rolling_avg(loc_list):												#DONE
 	shape=(loc_arr.shape[-1]-args.nb_smoothing+1,args.nb_smoothing)
 	strides=(loc_arr.strides[-1],loc_arr.strides[-1])   	
 	return numpy.average(numpy.lib.stride_tricks.as_strided(loc_arr, shape=shape, strides=strides), -1)
-def get_sizes_sampled():												#DONE
+def get_sizes_sampled():
 	
 	global colours_nb_sizes
 	global cluster_sizes_sampled
@@ -1063,6 +1079,9 @@ def get_sizes_sampled():												#DONE
 		colours_nb_groups = len(cluster_groups_sampled)
 		cluster_groups_sampled = sorted(numpy.unique(proteins_cluster_status_groups))
 	
+	cluster_sizes_nb = {c_size: numpy.zeros(nb_frames_to_process) for c_size in cluster_sizes_sampled + [-1,0]}
+	cluster_sizes_pc = {c_size: numpy.zeros(nb_frames_to_process) for c_size in cluster_sizes_sampled + [-1,0]}
+		
 	return
 def update_color_dict():												#DONE
 	
@@ -1077,11 +1096,11 @@ def update_color_dict():												#DONE
 		colours_sizes[c_size] = tmp_colours_value[c_index]
 		colours_sizes_list.append(tmp_colours_value[c_index])
 	#interfacial proteins on the lower leaflet
-	if -1 in proteins_groups_sampled:
+	if -1 in cluster_groups_sampled:
 		colours_sizes[-1] = "#808080"
 		colours_sizes_list.insert(0, "#808080")
 	#interfacial proteins on the upper leaflet
-	if 0 in proteins_groups_sampled:
+	if 0 in cluster_groups_sampled:
 		colours_sizes[-0] = "#C0C0C0"
 		colours_sizes_list.append("#C0C0C0")
 
@@ -1089,112 +1108,59 @@ def update_color_dict():												#DONE
 	#-------
 	if args.cluster_groups_file != "no":
 		#proteins in cluster of a different size
-		if groups_number in proteins_groups_sampled:					#choice of appending or prepending.. (top or bottom of colour bar...)
+		if groups_number in cluster_groups_sampled:					#choice of appending or prepending.. (top or bottom of colour bar...)
 			colours_groups_list.append("#E6E6E6")
 		#interfacial proteins on the lower leaflet
-		if groups_number+1 in proteins_groups_sampled:
+		if groups_number+1 in cluster_groups_sampled:
 			colours_groups_list.insert(0, "#808080")
 		#interfacial proteins on the upper leaflet
-		if groups_number+2 in proteins_groups_sampled:
+		if groups_number+2 in cluster_groups_sampled:
 			colours_groups_list.append("#C0C0C0")
 
 	return
 def calculate_statistics():
+
+	#nb and corresponding % of each size / group
+	#-------------------------------------------
+	for f_index in range(0,nb_frames_to_process):
+		#nb and % of each size / group
+		tmp_sizes = list(proteins_cluster_size_mat[:,frame_index])
+		tmp_max_size = float("-inf")
+		tmp_max_nb = 0
+		tmp_max_pc = 0
+		for c_size in cluster_sizes_sampled:
+			tmp_nb = int(tmp_sizes.count(c_size)/float(c_size))
+			tmp_pc = tmp_sizes.count(c_size)/float(proteins_nb)*100
+			cluster_sizes_nb[c_size][f_index] = tmp_nb
+			cluster_sizes_pc[c_size][f_index] = tmp_pc
+			if tmp_nb > 0 and c_size > tmp_max_size:
+				tmp_max_nb = tmp_nb
+				tmp_max_pc = tmp_pc
+				tmp_max_size = c_size
+			if args.cluster_groups_file != "no":
+				g_index = groups_sizes_dict[c_size]
+				cluster_groups_nb[g_index][f_index][g_index] += tmp_nb
+				cluster_groups_nb[g_index][f_index][g_index] += tmp_pc
 		
-	global proteins_cluster_size_mat, proteins_cluster_group_mat
+		#biggest cluster size
+		cluster_biggest_nb[f_index] = tmp_max_nb
+		cluster_biggest_pc[f_index] = tmp_max_pc		
+		cluster_biggest_size[f_index] = tmp_max_size			
 
-	#preprocess: create dictionary of matrix of sizes sampled by each residue at each frame
-	proteins_cluster_size_mat=numpy.asarray(proteins_cluster_size.values())
-	proteins_cluster_group_mat=numpy.asarray(proteins_cluster_group.values())
+	#longest stability of each size group
+	#------------------------------------
+	if if args.xtcfilename != "no" and args.cluster_groups_file != "no":
+		for g_index in cluster_groups_sampled:
+			#find max stability of current group index for each protein
+			tmp_proteins_stability = {}
+			for p_index in range(0,proteins_nb):
+				if g_index in proteins_cluster_group_mat[p_index,:]:
+					tmp_proteins_stability[p_index] = max(len(list(v)) for g,v in itertools.groupby(proteins_cluster_group_mat[p_index,:], lambda x: x == g_index) if g)
+				else:
+					tmp_proteins_stability[p_index] = 0
 
-	#case: gro file
-	#==============
-	if args.xtcfilename=="no":
-		#preprocess: create data structure
-		tmp_groups_nb={}
-		tmp_groups_pc={}
-
-		#initialise group data
-		if args.cluster_groups_file!="no":
-			for g_index in proteins_groups_sampled:
-				tmp_groups_nb[g_index]=0
-				tmp_groups_pc[g_index]=0
-				
-		#calculate % represented by each size / size groups
-		for c_size in proteins_sizes_sampled:
-			tmp_sizes=list(proteins_cluster_size_mat[:,0])
-			tmp_nb=int(tmp_sizes.count(c_size)/float(c_size))
-			tmp_pc=tmp_sizes.count(c_size)/float(proteins_nb)*100
-			sizes_nb[c_size].append(tmp_nb)
-			sizes_pc[c_size].append(tmp_pc)
-			if args.cluster_groups_file!="no":
-				tmp_groups_nb[groups_sizes_dict[c_size]]+=tmp_nb
-				tmp_groups_pc[groups_sizes_dict[c_size]]+=tmp_pc		
-	
-		#size groups
-		if args.cluster_groups_file!="no":
-			for g_index in proteins_groups_sampled:
-				groups_nb[g_index].append(tmp_groups_nb[g_index])
-				groups_pc[g_index].append(tmp_groups_pc[g_index])
-
-	#case: xtc file
-	#==============
-	else:
-		#evolution of % represented by each size / size group
-		#----------------------------------------------------
-		#preprocess: create data structure
-		tmp_groups_nb={}
-		tmp_groups_pc={}
-	
-		#calculate % represented by each size / size groups
-		for frame in sorted(time_stamp.iterkeys()):
-			frame_index=sorted(time_stamp.keys()).index(frame)
-			#initialise size groups pc				
-			for g_index in proteins_groups_sampled:
-				tmp_groups_nb[g_index]=0
-				tmp_groups_pc[g_index]=0
-			#sizes
-			tmp_sizes=list(proteins_cluster_size_mat[:,frame_index])
-			tmp_max_size=0
-			tmp_max_nb=0
-			tmp_max_pc=0
-			for c_size in proteins_sizes_sampled:
-				tmp_nb=int(tmp_sizes.count(c_size)/float(c_size))
-				tmp_pc=tmp_sizes.count(c_size)/float(proteins_nb)*100
-				sizes_nb[c_size].append(tmp_nb)
-				sizes_pc[c_size].append(tmp_pc)
-				if tmp_nb>0 and c_size>tmp_max_size:
-					tmp_max_size=c_size
-					tmp_max_nb=tmp_nb
-					tmp_max_pc=tmp_pc
-				if args.cluster_groups_file!="no":
-					tmp_groups_nb[groups_sizes_dict[c_size]]+=tmp_nb
-					tmp_groups_pc[groups_sizes_dict[c_size]]+=tmp_pc
-			
-			#biggest cluster size
-			cluster_biggest_size[frame_index]=tmp_max_size
-			cluster_biggest_nb[frame_index]=tmp_max_nb
-			cluster_biggest_pc[frame_index]=tmp_max_pc		
-			
-			#size groups
-			if args.cluster_groups_file!="no":
-				for g_index in proteins_groups_sampled:
-					groups_nb[g_index].append(tmp_groups_nb[g_index])
-					groups_pc[g_index].append(tmp_groups_pc[g_index])
-							
-		#longest stability of each size group
-		#------------------------------------
-		if args.cluster_groups_file!="no":
-			for g_index in proteins_groups_sampled:
-				#find max stability of current group index for each lipid
-				tmp_proteins_stability={}
-				for p_index in range(0,proteins_nb):
-					if g_index in proteins_cluster_group_mat[p_index,:]:
-						tmp_proteins_stability[p_index]=max(len(list(v)) for g,v in itertools.groupby(proteins_cluster_group_mat[p_index,:], lambda x: x == g_index) if g)
-					else:
-						tmp_proteins_stability[p_index]=0
-				#store maximum stability
-				proteins_groups_stability[g_index]=max(tmp_proteins_stability.values())
+			#store maximum stability
+			proteins_groups_stability[g_index] = max(tmp_proteins_stability.values())
 
 	return
 def smooth_data():														#DONE
@@ -1213,16 +1179,95 @@ def smooth_data():														#DONE
 	cluster_biggest_size_smoothed = rolling_avg(cluster_biggest_size)
 	
 	#size
-	for c_size in proteins_sizes_sampled:
+	for c_size in cluster_sizes_sampled:
 		cluster_sizes_nb_smoothed[c_size] = rolling_avg(cluster_sizes_nb[c_size])
 		cluster_sizes_pc_smoothed[c_size] = rolling_avg(cluster_sizes_pc[c_size])
 	
 	#groups
 	if args.cluster_groups_file!="no":
-		for g_index in proteins_groups_sampled:
+		for g_index in cluster_groups_sampled:
 			cluster_groups_nb_smoothed[g_index] = rolling_avg(cluster_groups_nb[g_index])
 			cluster_groups_pc_smoothed[g_index] = rolling_avg(cluster_groups_pc[g_index])
 		
+	return
+def process_clusters(clusters):
+
+	#case: store cluster size only
+	#-----------------------------
+	if args.cluster_groups_file == "no":
+		for cluster in clusters:
+			c_size = numpy.size(cluster)
+			proteins_cluster_status_sizes[cluster, f_index] = c_size
+
+	#case: store cluster size and group size
+	#---------------------------------------
+	else:
+		for cluster in clusters:
+			c_size = numpy.size(cluster)
+			g_index = groups_sizes_dict[c_size]
+			proteins_cluster_status_sizes[cluster, f_index] = c_size
+			proteins_cluster_status_groups[cluster, f_index] = g_index
+
+	return
+def process_clusters_TM(clusters):
+
+	tmp_lip_coords = {l: leaflet_sele[l].coordinates() for l in ["lower","upper"]}
+	
+	#case: store cluster size only
+	#-----------------------------
+	if args.cluster_groups_file == "no":			
+		for cluster in clusters:
+			c_size = numpy.size(cluster)
+
+			#create selection for current cluster
+			c_sele = MDAnalysis.core.AtomGroup.AtomGroup([])	
+			for p_index in cluster:
+				c_sele += proteins_sele[p_index]
+			
+			#find closest PO4 particles for each particles of clusters, if all are in the same leaflet then it's surfacic [NB: this is done at the CLUSTER level (the same criteria at the protein level would probably fail)]
+			dist_min_lower = numpy.min(MDAnalysis.analysis.distances.distance_array(c_sele.coordinates(), tmp_lip_coords["lower"], U.trajectory.ts.dimensions), axis = 1)
+			dist_min_upper = numpy.min(MDAnalysis.analysis.distances.distance_array(c_sele.coordinates(), tmp_lip_coords["upper"], U.trajectory.ts.dimensions), axis = 1)
+			dist = dist_min_upper - dist_min_lower
+			   
+			#case: interfacial lower
+			if numpy.size(dist[dist>0]) == numpy.size(dist):
+				proteins_cluster_status_sizes[cluster, f_index] = -1
+			#case: interfacial upper
+			elif numpy.size(dist[dist>0]) == 0:
+				proteins_cluster_status_sizes[cluster, f_index] = 0
+			#case: TM
+			else:
+				proteins_cluster_status_sizes[cluster, f_index] = c_size				
+
+	#case: store cluster size and group size
+	#---------------------------------------
+	else:
+		for cluster in clusters:
+			c_size = numpy.size(cluster)
+			g_index = groups_sizes_dict[c_size]
+
+			#create selection for current cluster
+			c_sele = MDAnalysis.core.AtomGroup.AtomGroup([])	
+			for p_index in cluster:
+				c_sele += proteins_sele[p_index]
+			
+			#find closest PO4 particles for each particles of clusters, if all are in the same leaflet then it's surfacic [NB: this is done at the CLUSTER level (the same criteria at the protein level would probably fail)]
+			dist_min_lower = numpy.min(MDAnalysis.analysis.distances.distance_array(c_sele.coordinates(), tmp_lip_coords["lower"], U.trajectory.ts.dimensions), axis = 1)
+			dist_min_upper = numpy.min(MDAnalysis.analysis.distances.distance_array(c_sele.coordinates(), tmp_lip_coords["upper"], U.trajectory.ts.dimensions), axis = 1)
+			dist = dist_min_upper - dist_min_lower
+			   
+			#case: interfacial lower
+			if numpy.size(dist[dist>0]) == numpy.size(dist):
+				proteins_cluster_status_sizes[cluster, f_index] = -1
+				proteins_cluster_status_groups[cluster, f_index] = groups_number + 1 
+			#case: interfacial upper
+			elif numpy.size(dist[dist>0]) == 0:
+				proteins_cluster_status_sizes[cluster, f_index] = 0
+				proteins_cluster_status_groups[cluster, f_index] = groups_number + 2 
+			#case: TM
+			else:
+				proteins_cluster_status_sizes[cluster, f_index] = c_size				
+				proteins_cluster_status_groups[cluster, f_index] = g_index
 	return
 
 #=========================================================================================
@@ -1248,16 +1293,12 @@ def write_warning():
 		output_stat.write(" - search radius = " + str(args.dbscan_dist) + " Angstrom, nb of neighbours = " + str(args.dbscan_nb) + "\n")
 	output_stat.write("\n")
 	#warning message
-	output_stat.write("Warning: a single cluster size (" + str(proteins_sizes_sampled[0]) + ") was detected throughout the trajectory. Check the -m, -c, -r or -n options (see cluster_prot -h).")
+	output_stat.write("Warning: a single cluster size (" + str(cluster_sizes_sampled[0]) + ") was detected throughout the trajectory. Check the -m, -c, -r or -n options (see cluster_prot -h).")
 	output_stat.close()
 	
 	return
 
-#case: xtc file
-#==============
 #sizes
-#-----
-#biggest
 def write_xvg_biggest():
 	filename_txt=os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_3_biggest/xvg/1_2_clusterprot_biggest.txt'
 	filename_xvg=os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_3_biggest/xvg/1_2_clusterprot_biggest.xvg'
@@ -1415,7 +1456,6 @@ def graph_xvg_cluster_biggest_smoothed():
 	fig.savefig(filename_svg)
 	plt.close()
 	return
-#each size
 def write_xvg_sizes():
 
 	filename_txt=os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/xvg/1_2_clusterprot_1D.txt'
@@ -1433,15 +1473,15 @@ def write_xvg_sizes():
 	output_xvg.write("@ legend box on\n")
 	output_xvg.write("@ legend loctype view\n")
 	output_xvg.write("@ legend 0.98, 0.8\n")
-	output_xvg.write("@ legend length " + str(len(proteins_groups_sampled)*2) + "\n")
+	output_xvg.write("@ legend length " + str(len(cluster_groups_sampled)*2) + "\n")
 	#write caption: %
-	for c_index in range(0,len(proteins_sizes_sampled)):
-		c_size=proteins_sizes_sampled[c_index]
+	for c_index in range(0,len(cluster_sizes_sampled)):
+		c_size=cluster_sizes_sampled[c_index]
 		output_xvg.write("@ s" + str(c_index) + " legend \"% " + str(c_size) + "\"\n")
 		output_txt.write("1_2_clusterprot_1D.xvg," + str(c_index+1) + ",% " + str(c_size) + "," + mcolors.rgb2hex(sizes_colors_dict[c_size]) + "\n")
 	#write caption: nb
-	for c in range(len(proteins_sizes_sampled),len(proteins_sizes_sampled)*2):
-		c_size=proteins_sizes_sampled[c-len(proteins_sizes_sampled)]
+	for c in range(len(cluster_sizes_sampled),len(cluster_sizes_sampled)*2):
+		c_size=cluster_sizes_sampled[c-len(cluster_sizes_sampled)]
 		output_xvg.write("@ s" + str(c) + " legend \"nb " + str(c_size) + "\"\n")
 		output_txt.write("1_2_clusterprot_1D.xvg," + str(c+1) + ",nb " + str(c_size) + "," + mcolors.rgb2hex(sizes_colors_dict[c_size]) + "\n")
 	output_txt.close()
@@ -1449,9 +1489,9 @@ def write_xvg_sizes():
 	for frame in sorted(time_stamp.iterkeys()):
 		results=str(time_stamp[frame])
 		frame_index=sorted(time_stamp.keys()).index(frame)
-		for c_size in proteins_sizes_sampled:
+		for c_size in cluster_sizes_sampled:
 			results+="	" + str(round(sizes_pc[c_size][frame_index],2))
-		for c_size in proteins_sizes_sampled:
+		for c_size in cluster_sizes_sampled:
 			results+="	" + str(round(sizes_nb[c_size][frame_index],2))
 		output_xvg.write(results + "\n")
 	output_xvg.close()
@@ -1473,7 +1513,7 @@ def graph_xvg_sizes():
 	#------------
 	ax1 = fig.add_subplot(211)
 	p_upper={}
-	for c_size in proteins_sizes_sampled:
+	for c_size in cluster_sizes_sampled:
 		tmp_label=str(c_size)
 		p_upper[c_size]=plt.plot(time_sorted, sizes_pc[c_size], color=sizes_colors_dict[c_size], linewidth=2.0, label=tmp_label)
 	fontP.set_size("small")
@@ -1486,7 +1526,7 @@ def graph_xvg_sizes():
 	#-------------
 	ax2 = fig.add_subplot(212)
 	p_lower={}
-	for c_size in proteins_sizes_sampled:
+	for c_size in cluster_sizes_sampled:
 		tmp_label=str(c_size)
 		p_lower[c_size]=plt.plot(time_sorted, sizes_nb[c_size], color=sizes_colors_dict[c_size], linewidth=2.0, label=tmp_label)
 	fontP.set_size("small")
@@ -1529,24 +1569,24 @@ def write_xvg_sizes_smoothed():
 	output_xvg.write("@ legend box on\n")
 	output_xvg.write("@ legend loctype view\n")
 	output_xvg.write("@ legend 0.98, 0.8\n")
-	output_xvg.write("@ legend length " + str(len(proteins_sizes_sampled)*2) + "\n")
+	output_xvg.write("@ legend length " + str(len(cluster_sizes_sampled)*2) + "\n")
 	#write caption: %
-	for c_index in range(0,len(proteins_sizes_sampled)):
-		c_size=proteins_sizes_sampled[c_index]
+	for c_index in range(0,len(cluster_sizes_sampled)):
+		c_size=cluster_sizes_sampled[c_index]
 		output_xvg.write("@ s" + str(c_index) + " legend \"% " + str(c_size) + "\"\n")
 		output_txt.write("1_4_clusterprot_1D_smoothed.xvg," + str(c_index+1) + ",% " + str(c_size) + "," + mcolors.rgb2hex(sizes_colors_dict[c_size]) + "\n")
 	#write caption: nb
-	for c in range(len(proteins_sizes_sampled),len(proteins_sizes_sampled)*2):
-		c_size=proteins_sizes_sampled[c-len(proteins_sizes_sampled)]
+	for c in range(len(cluster_sizes_sampled),len(cluster_sizes_sampled)*2):
+		c_size=cluster_sizes_sampled[c-len(cluster_sizes_sampled)]
 		output_xvg.write("@ s" + str(c) + " legend \"nb " + str(c_size) + "\"\n")
 		output_txt.write("1_4_clusterprot_1D_smoothed.xvg," + str(c+1) + ",nb " + str(c_size) + "," + mcolors.rgb2hex(sizes_colors_dict[c_size]) + "\n")
 	output_txt.close()
 	#write results
 	for frame_index in range(0, len(time_smoothed)):
 		results=str(time_smoothed[frame_index])
-		for c_size in proteins_sizes_sampled:
+		for c_size in cluster_sizes_sampled:
 			results+="	" + str(round(sizes_pc_smoothed[c_size][frame_index],2))
-		for c_size in proteins_sizes_sampled:
+		for c_size in cluster_sizes_sampled:
 			results+="	" + str(round(sizes_nb_smoothed[c_size][frame_index],2))
 		output_xvg.write(results + "\n")
 	output_xvg.close()
@@ -1568,7 +1608,7 @@ def graph_xvg_sizes_smoothed():
 	#------------
 	ax1 = fig.add_subplot(211)
 	p_upper={}
-	for c_size in proteins_sizes_sampled:
+	for c_size in cluster_sizes_sampled:
 		tmp_label=str(c_size)
 		p_upper[c_size]=plt.plot(time_smoothed, sizes_pc_smoothed[c_size], color=sizes_colors_dict[c_size], linewidth=2.0, label=tmp_label)
 	fontP.set_size("small")
@@ -1581,7 +1621,7 @@ def graph_xvg_sizes_smoothed():
 	#-------------
 	ax2 = fig.add_subplot(212)
 	p_lower={}
-	for c_size in proteins_sizes_sampled:
+	for c_size in cluster_sizes_sampled:
 		tmp_label=str(c_size)
 		p_lower[c_size]=plt.plot(time_smoothed, sizes_nb_smoothed[c_size], color=sizes_colors_dict[c_size], linewidth=2.0, label=tmp_label)
 	fontP.set_size("small")
@@ -1608,7 +1648,6 @@ def graph_xvg_sizes_smoothed():
 	plt.close()
 
 	return
-#2D summary
 def graph_aggregation_2D_sizes():
 		
 	#create filenames
@@ -1683,8 +1722,6 @@ def graph_aggregation_2D_sizes():
 	return
 
 #groups
-#------
-#each group
 def write_xvg_groups():
 	filename_txt=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_2_plots_1D/xvg/2_2_clusterprot_1D.txt'
 	filename_xvg=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_2_plots_1D/xvg/2_2_clusterprot_1D.xvg'
@@ -1701,10 +1738,10 @@ def write_xvg_groups():
 	output_xvg.write("@ legend box on\n")
 	output_xvg.write("@ legend loctype view\n")
 	output_xvg.write("@ legend 0.98, 0.8\n")
-	output_xvg.write("@ legend length " + str(len(proteins_groups_sampled)*2) + "\n")
+	output_xvg.write("@ legend length " + str(len(cluster_groups_sampled)*2) + "\n")
 	#write caption: %
-	for g in range(0,len(proteins_groups_sampled)):
-		g_index=proteins_groups_sampled[g]
+	for g in range(0,len(cluster_groups_sampled)):
+		g_index=cluster_groups_sampled[g]
 		if g_index==groups_number:
 			output_xvg.write("@ s" + str(g) + " legend \"% other\"\n")
 			output_txt.write("2_2_clusterprot_1D.xvg," + str(g+1) + ",% other," + mcolors.rgb2hex(groups_colors_dict[g_index]) + "\n")
@@ -1715,8 +1752,8 @@ def write_xvg_groups():
 			output_xvg.write("@ s" + str(g) + " legend \"%" + str(groups_boundaries[g_index][0]) + "-" + str(groups_boundaries[g_index][1]) + "\"\n")
 			output_txt.write("2_2_clusterprot_1D.xvg," + str(g+1) + ",% " + str(groups_boundaries[g_index][0]) + "-" + str(groups_boundaries[g_index][1]) + "," + mcolors.rgb2hex(groups_colors_dict[g_index]) + "\n")
 	#write caption: nb
-	for g in range(len(proteins_groups_sampled),len(proteins_groups_sampled)*2):
-		g_index=proteins_groups_sampled[g-len(proteins_groups_sampled)]
+	for g in range(len(cluster_groups_sampled),len(cluster_groups_sampled)*2):
+		g_index=cluster_groups_sampled[g-len(cluster_groups_sampled)]
 		if g_index==groups_number:
 			output_xvg.write("@ s" + str(g) + " legend \"nb other\"\n")
 			output_txt.write("2_2_clusterprot_1D.xvg," + str(g+1) + ",nb other," + mcolors.rgb2hex(groups_colors_dict[g_index]) + "\n")
@@ -1731,9 +1768,9 @@ def write_xvg_groups():
 	for frame in sorted(time_stamp.iterkeys()):
 		results=str(time_stamp[frame])
 		frame_index=sorted(time_stamp.keys()).index(frame)
-		for g_index in proteins_groups_sampled:
+		for g_index in cluster_groups_sampled:
 			results+="	" + str(round(groups_pc[g_index][frame_index],2))
-		for g_index in proteins_groups_sampled:
+		for g_index in cluster_groups_sampled:
 			results+="	" + str(round(groups_nb[g_index][frame_index],2))
 		output_xvg.write(results + "\n")
 	output_xvg.close()
@@ -1755,7 +1792,7 @@ def graph_xvg_groups():
 	#------------
 	ax1 = fig.add_subplot(211)
 	p_upper={}
-	for g_index in proteins_groups_sampled:
+	for g_index in cluster_groups_sampled:
 		if g_index==groups_number:
 			tmp_label="other"
 		elif groups_boundaries[g_index][1]==100000:
@@ -1773,7 +1810,7 @@ def graph_xvg_groups():
 	#-------------
 	ax2 = fig.add_subplot(212)
 	p_lower={}
-	for g_index in proteins_groups_sampled:
+	for g_index in cluster_groups_sampled:
 		if g_index==groups_number:
 			tmp_label="other"
 		elif groups_boundaries[g_index][1]==100000:
@@ -1821,10 +1858,10 @@ def write_xvg_groups_smoothed():
 	output_xvg.write("@ legend box on\n")
 	output_xvg.write("@ legend loctype view\n")
 	output_xvg.write("@ legend 0.98, 0.8\n")
-	output_xvg.write("@ legend length " + str(len(proteins_groups_sampled)*2) + "\n")
+	output_xvg.write("@ legend length " + str(len(cluster_groups_sampled)*2) + "\n")
 	#write caption: %
-	for g in range(0,len(proteins_groups_sampled)):
-		g_index=proteins_groups_sampled[g]
+	for g in range(0,len(cluster_groups_sampled)):
+		g_index=cluster_groups_sampled[g]
 		if g_index==groups_number:
 			output_xvg.write("@ s" + str(g) + " legend \"% other\"\n")
 			output_txt.write("2_3_clusterprot_1D_smoothed.xvg," + str(g+1) + ",% other," + mcolors.rgb2hex(groups_colors_dict[g_index]) + "\n")
@@ -1835,8 +1872,8 @@ def write_xvg_groups_smoothed():
 			output_xvg.write("@ s" + str(g) + " legend \"%" + str(groups_boundaries[g_index][0]) + "-" + str(groups_boundaries[g_index][1]) + "\"\n")
 			output_txt.write("2_3_clusterprot_1D_smoothed.xvg," + str(g+1) + ",% " + str(groups_boundaries[g_index][0]) + "-" + str(groups_boundaries[g_index][1]) + "," + mcolors.rgb2hex(groups_colors_dict[g_index]) + "\n")
 	#write caption: nb
-	for g in range(len(proteins_groups_sampled),len(proteins_groups_sampled)*2):
-		g_index=proteins_groups_sampled[g-len(proteins_groups_sampled)]
+	for g in range(len(cluster_groups_sampled),len(cluster_groups_sampled)*2):
+		g_index=cluster_groups_sampled[g-len(cluster_groups_sampled)]
 		if g_index==groups_number:
 			output_xvg.write("@ s" + str(g) + " legend \"nb other\"\n")
 			output_txt.write("2_3_clusterprot_1D_smoothed.xvg," + str(g+1) + ",nb other," + mcolors.rgb2hex(groups_colors_dict[g_index]) + "\n")
@@ -1850,9 +1887,9 @@ def write_xvg_groups_smoothed():
 	#write results
 	for frame_index in range(0, len(time_smoothed)):
 		results=str(time_smoothed[frame_index])
-		for g_index in proteins_groups_sampled:
+		for g_index in cluster_groups_sampled:
 			results+="	" + str(round(groups_pc_smoothed[g_index][frame_index],2))
-		for g_index in proteins_groups_sampled:
+		for g_index in cluster_groups_sampled:
 			results+="	" + str(round(groups_nb_smoothed[g_index][frame_index],2))
 		output_xvg.write(results + "\n")
 	output_xvg.close()
@@ -1874,7 +1911,7 @@ def graph_xvg_groups_smoothed():
 	#------------
 	ax1 = fig.add_subplot(211)
 	p_upper={}
-	for g_index in proteins_groups_sampled:
+	for g_index in cluster_groups_sampled:
 		if g_index==groups_number:
 			tmp_label="other"
 		elif groups_boundaries[g_index][1]==100000:
@@ -1892,7 +1929,7 @@ def graph_xvg_groups_smoothed():
 	#-------------
 	ax2 = fig.add_subplot(212)
 	p_lower={}
-	for g_index in proteins_groups_sampled:	
+	for g_index in cluster_groups_sampled:	
 		if g_index==groups_number:
 			tmp_label="other"
 		elif groups_boundaries[g_index][1]==100000:
@@ -1924,7 +1961,6 @@ def graph_xvg_groups_smoothed():
 	plt.close()
 
 	return
-#2D summary
 def graph_aggregation_2D_groups():
 	
 	#create filenames
@@ -2002,7 +2038,6 @@ def graph_aggregation_2D_groups():
 	plt.close()
 			
 	return
-#stability
 def write_stability_groups():
 	
 	filename_details=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_0_clusterprot_stability.stat'
@@ -2028,7 +2063,7 @@ def write_stability_groups():
 	
 	tmp_cap1=""
 	tmp_cap2="-----"
-	for g_index in proteins_groups_sampled:
+	for g_index in cluster_groups_sampled:
 		if g_index==groups_number:
 			tmp_cap1+="	other"
 		elif groups_boundaries[g_index][1]==100000:
@@ -2041,7 +2076,7 @@ def write_stability_groups():
 	output_stat.write(tmp_cap1 + "\n")
 	output_stat.write(tmp_cap2 + "\n")
 	results=str("")
-	for g_index in proteins_groups_sampled:
+	for g_index in cluster_groups_sampled:
 		results+= "	" + str(proteins_groups_stability[g_index])
 	output_stat.write(results + "\n")
 
@@ -2050,19 +2085,18 @@ def write_stability_groups():
 	return
 
 #annotations
-#===========
-def write_frame_stat(f_nb, f_index, t):
+def write_frame_stat(f_nb, f_index, f_t):
 
 	#case: gro file or xtc summary
-	#=============================
-	if f_index=="all" and t=="all":
+	#-----------------------------
+	if f_index == "all":
 		#sizes
 		#-----
 		#create file
-		if args.xtcfilename=="no":
-			filename_details=os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/' + args.grofilename[:-4] + '_annotated_clustprot_sizes_sampled.stat'		
+		if args.xtcfilename == "no":
+			filename_details = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/' + args.grofilename[:-4] + '_annotated_clustprot_sizes_sampled.stat'		
 		else:
-			filename_details=os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/' + args.xtcfilename[:-4] + '_annotated_clustprot_sizes_sampled.stat'		
+			filename_details = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/' + args.xtcfilename[:-4] + '_annotated_clustprot_sizes_sampled.stat'		
 		output_stat = open(filename_details, 'w')		
 	
 		#general info
@@ -2071,37 +2105,37 @@ def write_frame_stat(f_nb, f_index, t):
 		output_stat.write("1. nb of proteins: " + str(proteins_nb) + "\n")
 		output_stat.write("\n")
 		output_stat.write("2. cluster detection Method:\n")
-		if args.m_algorithm=="min":
+		if args.m_algorithm == "min":
 			output_stat.write(" - connectivity based (min distances)\n")
 			output_stat.write(" - contact cutoff = " + str(args.cutoff_connect) + " Angstrom\n")
-		elif args.m_algorithm=="cog":
+		elif args.m_algorithm == "cog":
 			output_stat.write(" - connectivity based (cog distances)\n")
 			output_stat.write(" - contact cutoff = " + str(args.cutoff_connect) + " Angstrom\n")
 		else:
 			output_stat.write(" - density based (DBSCAN)\n")
 			output_stat.write(" - search radius = " + str(args.dbscan_dist) + " Angstrom, nb of neighbours = " + str(args.dbscan_nb) + "\n")
-		if args.xtcfilename!="no":
+		if args.xtcfilename != "no":
 			output_stat.write("\n")
-			output_stat.write("3. nb frames processed:	" + str(nb_frames_processed) + " (" + str(nb_frames_xtc) + " frames in xtc, step=" + str(args.frames_dt) + ")\n")
+			output_stat.write("3. frame:	" + str(nb_frames_to_process) + " (" + str(nb_frames_xtc) + " frames in xtc, step=" + str(args.frames_dt) + ")\n")
 		
 		#data results
 		output_stat.write("\n")
 		output_stat.write("Sizes sampled: ")
-		tmp_res=str(proteins_sizes_sampled[0])
-		for c_size in proteins_sizes_sampled[1:]:
-			tmp_res+="," + str(c_size)
-		output_stat.write(tmp_res + "\n")
+		tmp_res = ""
+		for c_size in cluster_sizes_sampled:
+			tmp_res += "," + str(c_size)
+		output_stat.write(tmp_res[1:] + "\n")
 		output_stat.write("\n")
 		output_stat.close()
 		
 		#groups
 		#------
-		if args.cluster_groups_file!="no":
+		if args.cluster_groups_file != "no":
 			#create file
-			if args.xtcfilename=="no":
-				filename_details=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/' + args.grofilename[:-4] + '_annotated_clustprot_groups_sampled.stat'		
+			if args.xtcfilename == "no":
+				filename_details = os.getcwd() + '/' + str(args.output_folder) + '/2_groups/' + args.grofilename[:-4] + '_annotated_clustprot_groups_sampled.stat'		
 			else:
-				filename_details=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/' + args.xtcfilename[:-4] + '_annotated_clustprot_groups_sampled.stat'		
+				filename_details = os.getcwd() + '/' + str(args.output_folder) + '/2_groups/' + args.xtcfilename[:-4] + '_annotated_clustprot_groups_sampled.stat'		
 			output_stat = open(filename_details, 'w')		
 
 			#general info
@@ -2121,24 +2155,21 @@ def write_frame_stat(f_nb, f_index, t):
 				output_stat.write(" - search radius = " + str(args.dbscan_dist) + " Angstrom, nb of neighbours = " + str(args.dbscan_nb) + "\n")
 			if args.xtcfilename!="no":
 				output_stat.write("\n")
-				output_stat.write("3. nb frames processed:	" + str(nb_frames_processed) + " (" + str(nb_frames_xtc) + " frames in xtc, step=" + str(args.frames_dt) + ")\n")
+				output_stat.write("3. nb frames processed:	" + str(nb_frames_to_process) + " (" + str(nb_frames_xtc) + " frames in xtc, step=" + str(args.frames_dt) + ")\n")
 
 			#group index definition
 			output_stat.write("\n")
 			output_stat.write("Group size ranges:\n")
-			for g_index in range(0,groups_number):
-				if groups_boundaries[g_index][1]==100000:
-					output_stat.write(str(g_index) + "=" + str(groups_boundaries[g_index][0]) + "+\n")
-				else:
-					output_stat.write(str(g_index) + "=" + str(groups_boundaries[g_index][0]) + "-" + str(groups_boundaries[g_index][1]) + "\n")
+			for g_index in range(0,groups_number+3):
+				output_stat.write(str(g_index) + "=" + str(groups_labels[g]) + "+\n")
 
 			#data results
 			output_stat.write("\n")
 			output_stat.write("Groups sampled: ")
-			tmp_res=str(proteins_groups_sampled[0])
-			for g_index in proteins_groups_sampled[1:]:
-				tmp_res+="," + str(g_index)
-			output_stat.write(tmp_res + "\n")		
+			tmp_res = ""
+			for g_index in cluster_groups_sampled:
+				tmp_res += "," + str(g_index)
+			output_stat.write(tmp_res[1:] + "\n")		
 			output_stat.write("\n")
 		output_stat.close()
 		
@@ -2148,10 +2179,10 @@ def write_frame_stat(f_nb, f_index, t):
 		#sizes
 		#-----
 		#create file
-		if args.xtcfilename=="no":
+		if args.xtcfilename == "no":
 			filename_details=os.getcwd() + '/' + str(args.output_folder) + '/3_snapshots/sizes/' + args.grofilename[:-4] + '_annotated_clusterprot_sizes.stat'
 		else:
-			filename_details=os.getcwd() + "/" + str(args.output_folder) + '/3_snapshots/sizes/' + args.xtcfilename[:-4] + '_annotated_clusterprot_sizes_' + str(int(t)).zfill(5) + 'ns.stat'
+			filename_details=os.getcwd() + "/" + str(args.output_folder) + '/3_snapshots/sizes/' + args.xtcfilename[:-4] + '_annotated_clusterprot_sizes_' + str(int(f_t)).zfill(5) + 'ns.stat'
 		output_stat = open(filename_details, 'w')		
 	
 		#general info
@@ -2159,44 +2190,44 @@ def write_frame_stat(f_nb, f_index, t):
 		output_stat.write("\n")
 		output_stat.write("1. bb of proteins: " + str(proteins_nb) + "\n")
 		output_stat.write("2. cluster detection Method:\n")
-		if args.m_algorithm=="min":
+		if args.m_algorithm == "min":
 			output_stat.write(" - connectivity based (min distances)\n")
 			output_stat.write(" - contact cutoff = " + str(args.cutoff_connect) + " Angstrom\n")
-		elif args.m_algorithm=="cog":
+		elif args.m_algorithm == "cog":
 			output_stat.write(" - connectivity based (cog distances)\n")
 			output_stat.write(" - contact cutoff = " + str(args.cutoff_connect) + " Angstrom\n")
 		else:
 			output_stat.write(" - density based (DBSCAN)\n")
 			output_stat.write(" - search radius = " + str(args.dbscan_dist) + " Angstrom, nb of neighbours = " + str(args.dbscan_nb) + "\n")
-		if args.xtcfilename!="no":
+		if args.xtcfilename != "no":
 			output_stat.write("\n")
-			output_stat.write("3. time: " + str(t) + "ns (frame " + str(f_nb) + "/" + str(nb_frames_xtc) + ")\n")
+			output_stat.write("3. time: " + str(f_t) + "ns (frame " + str(f_nb) + "/" + str(nb_frames_xtc) + ")\n")
 
 		#what's in this file
 		output_stat.write("\n")
 		output_stat.write("Distribution of proteins by cluster size:\n")
 		output_stat.write("\n")
-		tmp_cap1="cluster_size"
-		tmp_cap2="-----------"
-		tmp_res="% proteins"
-		for c_size in proteins_sizes_sampled:
-			tmp_cap1+="	" + str(c_size)
-			tmp_cap2+="--------"
-		output_stat.write(tmp_cap1+"\n")
-		output_stat.write(tmp_cap2+"\n")
-		for c_size in proteins_sizes_sampled:		
-			tmp_res+="	" + str(round(sizes_pc[c_size][f_index],1))
+		tmp_cap1 = "cluster_size"
+		tmp_cap2 = "-----------"
+		tmp_res = "% proteins"
+		for c_size in cluster_sizes_sampled:
+			tmp_cap1 += "	" + str(c_size)
+			tmp_cap2 += "--------"
+		output_stat.write(tmp_cap1 + "\n")
+		output_stat.write(tmp_cap2 + "\n")
+		for c_size in cluster_sizes_sampled:		
+			tmp_res += "	" + str(round(cluster_sizes_pc[c_size][f_index], 1))
 		output_stat.write(tmp_res + "\n")		
 		output_stat.close()
 		
 		#groups
 		#======
-		if args.cluster_groups_file!="no":
+		if args.cluster_groups_file != "no":
 			#create file
-			if args.xtcfilename=="no":
-				filename_details=os.getcwd() + '/' + str(args.output_folder) + '/3_snapshots/groups/' + args.grofilename[:-4] + '_annotated_clusterprot_groups.stat'
+			if args.xtcfilename == "no":
+				filename_details = os.getcwd() + '/' + str(args.output_folder) + '/3_snapshots/groups/' + args.grofilename[:-4] + '_annotated_clusterprot_groups.stat'
 			else:
-				filename_details=os.getcwd() + "/" + str(args.output_folder) + '/3_snapshots/groups/' + args.xtcfilename[:-4] + '_annotated_clusterprot_groups_' + str(int(t)).zfill(5) + 'ns.stat'
+				filename_details = os.getcwd() + "/" + str(args.output_folder) + '/3_snapshots/groups/' + args.xtcfilename[:-4] + '_annotated_clusterprot_groups_' + str(int(f_t)).zfill(5) + 'ns.stat'
 			output_stat = open(filename_details, 'w')		
 		
 			#general info
@@ -2204,219 +2235,175 @@ def write_frame_stat(f_nb, f_index, t):
 			output_stat.write("\n")
 			output_stat.write("1. nb of proteins: " + str(proteins_nb) + "\n")
 			output_stat.write("2. cluster detection Method:\n")
-			if args.m_algorithm=="min":
+			if args.m_algorithm == "min":
 				output_stat.write(" - connectivity based (min distances)\n")
 				output_stat.write(" - contact cutoff = " + str(args.cutoff_connect) + " Angstrom\n")
-			elif args.m_algorithm=="cog":
+			elif args.m_algorithm == "cog":
 				output_stat.write(" - connectivity based (cog distances)\n")
 				output_stat.write(" - contact cutoff = " + str(args.cutoff_connect) + " Angstrom\n")
 			else:
 				output_stat.write(" - density based (DBSCAN)\n")
 				output_stat.write(" - search radius = " + str(args.dbscan_dist) + " Angstrom, nb of neighbours = " + str(args.dbscan_nb) + "\n")
-			if args.xtcfilename!="no":
+			if args.xtcfilename != "no":
 				output_stat.write("\n")
-				output_stat.write("3. time: " + str(t) + "ns (frame " + str(f_nb) + "/" + str(nb_frames_xtc) + ")\n")
+				output_stat.write("3. time: " + str(f_t) + "ns (frame " + str(f_nb) + "/" + str(nb_frames_xtc) + ")\n")
 		
 			#group index definition
 			output_stat.write("\n")
 			output_stat.write("Group size ranges:\n")
-			for g_index in range(0,groups_number):
-				if groups_boundaries[g_index][1]==100000:
-					output_stat.write(str(g_index) + "=" + str(groups_boundaries[g_index][0]) + "+\n")
-				else:
-					output_stat.write(str(g_index) + "=" + str(groups_boundaries[g_index][0]) + "-" + str(groups_boundaries[g_index][1]) + "\n")
+			for g_index in range(0,groups_number+3):
+				output_stat.write(str(g_index) + "=" + str(groups_labels[g_index]) + "+\n")
 
 			#what's in this file
 			output_stat.write("\n")
 			output_stat.write("Distribution of proteins by cluster size group:\n")
 			output_stat.write("\n")
-			tmp_cap1="cluster_group"
-			tmp_cap2="-----------"
-			tmp_res="% proteins"
-			for c_group in proteins_groups_sampled:
-				tmp_cap1+="	" + str(c_group)
-				tmp_cap2+="--------"
-			output_stat.write(tmp_cap1+"\n")
-			output_stat.write(tmp_cap2+"\n")
-			for c_group in proteins_groups_sampled:		
-				tmp_res+="	" + str(round(groups_pc[c_group][f_index],1))
+			tmp_cap1 = "cluster_group"
+			tmp_cap2 = "-----------"
+			tmp_res = "% proteins"
+			for c_group in cluster_groups_sampled:
+				tmp_cap1 += "	" + str(c_group)
+				tmp_cap2 += "--------"
+			output_stat.write(tmp_cap1 + "\n")
+			output_stat.write(tmp_cap2 + "\n")
+			for c_group in cluster_groups_sampled:		
+				tmp_res += "	" + str(round(groups_pc[c_group][f_index],1))
 			output_stat.write(tmp_res + "\n")		
 			output_stat.close()
 
 	return
-def write_frame_snapshot(f_index, t):
+def write_frame_snapshot(f_index, f_t):
 	
 	#sizes
-	#=====
+	#-----
 	#store cluster info in beta factor field
 	for p_index in range(0,proteins_nb):
-			proteins_sele[p_index].set_bfactor(proteins_cluster_size[p_index][f_index])
+			proteins_sele[p_index].set_bfactor(proteins_cluster_status_sizes[p_index,f_index])
 	
 	#write annotated file
-	if args.xtcfilename=="no":
+	if args.xtcfilename == "no":
 		all_atoms.write(os.getcwd() + '/' + str(args.output_folder) + '/3_snapshots/sizes/' + args.grofilename[:-4] + '_annotated_clusterprot_sizes', format="PDB")
 	else:
-		tmp_name=os.getcwd() + "/" + str(args.output_folder) + '/3_snapshots/sizes/' + args.xtcfilename[:-4] + '_annotated_clusterprot_sizes_' + str(int(t)).zfill(5) + 'ns.pdb'
-		W=Writer(tmp_name, nb_atoms)
+		tmp_name = os.getcwd() + "/" + str(args.output_folder) + '/3_snapshots/sizes/' + args.xtcfilename[:-4] + '_annotated_clusterprot_sizes_' + str(int(f_t)).zfill(5) + 'ns.pdb'
+		W = Writer(tmp_name, nb_atoms)
 		W.write(all_atoms)
 	
 	#groups
-	#======
-	if args.cluster_groups_file!="no":
+	#------
+	if args.cluster_groups_file != "no":
 		#store cluster info in beta factor field
 		for p_index in range(0,proteins_nb):
-				proteins_sele[p_index].set_bfactor(proteins_cluster_group[p_index][f_index])
+				proteins_sele[p_index].set_bfactor(proteins_cluster_status_groups[p_index,f_index])
 		
 		#write annotated file
-		if args.xtcfilename=="no":
-			all_atoms.write(os.getcwd() + '/' + str(args.output_folder) + '/3_snapshots/groups/' + args.grofilename[:-4] + '_annotated_clusterprot_groups', format="PDB")
+		if args.xtcfilename == "no":
+			all_atoms.write(os.getcwd() + '/' + str(args.output_folder) + '/3_snapshots/groups/' + args.grofilename[:-4] + '_annotated_clusterprot_groups', format = "PDB")
 		else:
-			tmp_name=os.getcwd() + "/" + str(args.output_folder) + '/3_snapshots/groups/' + args.xtcfilename[:-4] + '_annotated_clusterprot_groups_' + str(int(t)).zfill(5) + 'ns.pdb'
-			W=Writer(tmp_name, nb_atoms)
+			tmp_name=os.getcwd() + "/" + str(args.output_folder) + '/3_snapshots/groups/' + args.xtcfilename[:-4] + '_annotated_clusterprot_groups_' + str(int(f_t)).zfill(5) + 'ns.pdb'
+			W = Writer(tmp_name, nb_atoms)
 			W.write(all_atoms)
 		
 	return
-def write_frame_annotation(f_index,t):
+def write_frame_annotation(f_index, f_t):
 
 	#sizes
-	#=====
+	#-----
 	#create file
-	if args.xtcfilename=="no":
+	if args.xtcfilename == "no":
 		filename_details=os.getcwd() + '/' + str(args.output_folder) + '/3_snapshots/sizes/' + args.grofilename[:-4] + '_annotated_clusterprot_sizes.txt'
 	else:
-		filename_details=os.getcwd() + "/" + str(args.output_folder) + '/3_snapshots/sizes/' + args.xtcfilename[:-4] + '_annotated_clusterprot_sizes_' + str(int(t)).zfill(5) + 'ns.txt'
+		filename_details=os.getcwd() + "/" + str(args.output_folder) + '/3_snapshots/sizes/' + args.xtcfilename[:-4] + '_annotated_clusterprot_sizes_' + str(int(f_t)).zfill(5) + 'ns.txt'
 	output_stat = open(filename_details, 'w')		
 
 	#output VMD protein selection line
-	tmp_prot_sele=proteins_sele_string_VMD[0]
-	for p_index in range(1,proteins_nb):
-		tmp_prot_sele+="." + proteins_sele_string_VMD[p_index]
-	output_stat.write(tmp_prot_sele + "\n")
+	tmp_prot_sele = ""
+	for p_index in range(0,proteins_nb):
+		tmp_prot_sele += "." + proteins_sele_string_VMD[p_index]
+	output_stat.write(tmp_prot_sele[1:] + "\n")
 				
 	#ouput min and max size
-	output_stat.write(str(numpy.min(proteins_cluster_size_mat[:,f_index])) + "." + str(numpy.max(proteins_cluster_size_mat[:,f_index])) + "\n")
+	output_stat.write(str(numpy.min(proteins_cluster_status_sizes[:,f_index])) + "." + str(numpy.max(proteins_cluster_status_sizes[:,f_index])) + "\n")
 	
 	#ouptut cluster size for each protein
-	tmp_sizes="1"
+	tmp_sizes = "1"
 	for p_index in range(0,proteins_nb):
-		tmp_sizes+="." + str(proteins_cluster_size_mat[p_index,f_index])
+		tmp_sizes += "." + str(proteins_cluster_status_sizes[p_index,f_index])
 	output_stat.write(tmp_sizes + "\n")
 	output_stat.close()
 	
 	#groups
-	#======
-	if args.cluster_groups_file!="no":
+	#------
+	if args.cluster_groups_file != "no":
 		#create file
-		if args.xtcfilename=="no":
-			filename_details=os.getcwd() + '/' + str(args.output_folder) + '/3_snapshots/groups/' + args.grofilename[:-4] + '_annotated_clusterprot_groups.txt'
+		if args.xtcfilename == "no":
+			filename_details = os.getcwd() + '/' + str(args.output_folder) + '/3_snapshots/groups/' + args.grofilename[:-4] + '_annotated_clusterprot_groups.txt'
 		else:
-			filename_details=os.getcwd() + "/" + str(args.output_folder) + '/3_snapshots/groups/' + args.xtcfilename[:-4] + '_annotated_clusterprot_groups_' + str(int(t)).zfill(5) + 'ns.txt'
+			filename_details = os.getcwd() + "/" + str(args.output_folder) + '/3_snapshots/groups/' + args.xtcfilename[:-4] + '_annotated_clusterprot_groups_' + str(int(f_t)).zfill(5) + 'ns.txt'
 		output_stat = open(filename_details, 'w')		
 	
 		#output VMD protein selection line
-		tmp_prot_sele=proteins_sele_string_VMD[0]
-		for p_index in range(1,proteins_nb):
-			tmp_prot_sele+="." + proteins_sele_string_VMD[p_index]
-		output_stat.write(tmp_prot_sele + "\n")
+		tmp_prot_sele = ""
+		for p_index in range(0,proteins_nb):
+			tmp_prot_sele += "." + proteins_sele_string_VMD[p_index]
+		output_stat.write(tmp_prot_sele[1:] + "\n")
 		
 		#ouput min and max size
-		output_stat.write(str(numpy.min(proteins_cluster_group_mat[:,f_index])) + "." + str(numpy.max(proteins_cluster_group_mat[:,f_index])) + "\n")
+		output_stat.write(str(numpy.min(proteins_cluster_status_groups[:,f_index])) + "." + str(numpy.max(proteins_cluster_status_groups[:,f_index])) + "\n")
 		
 		#ouptut cluster size for each protein
-		tmp_groups="1"
+		tmp_groups = "1"
 		for p_index in range(0,proteins_nb):
-			tmp_groups+="." + str(proteins_cluster_group_mat[p_index,f_index])
+			tmp_groups += "." + str(proteins_cluster_status_groups[p_index,f_index])
 		output_stat.write(tmp_groups + "\n")
 		output_stat.close()
 	
 	return
-def write_xtc_snapshots():
-	
-	#NB: - this will always output the first and final frame snapshots
-	#    - it will also intermediate frames according to the -w option	
-
-	loc_nb_frames_processed=0
-	for ts in U.trajectory:
-
-		#case: frames before specified time boundaries
-		#---------------------------------------------
-		if ts.time/float(1000)<args.t_start:
-			progress='\r -skipping frame ' + str(ts.frame) + '/' + str(nb_frames_xtc) + '        '
-			sys.stdout.flush()
-			sys.stdout.write(progress)
-
-		#case: frames within specified time boundaries
-		#---------------------------------------------
-		elif ts.time/float(1000)>args.t_start and ts.time/float(1000)<args.t_end:
-			progress='\r -writing snapshots...   frame ' + str(ts.frame) + '/' + str(nb_frames_xtc) + '        '
-			sys.stdout.flush()
-			sys.stdout.write(progress)
-			if ((ts.frame-1) % args.frames_dt)==0:
-				if ((loc_nb_frames_processed) % args.frames_write_dt)==0 or loc_nb_frames_processed==nb_frames_processed-1:
-					write_frame_stat(ts.frame, loc_nb_frames_processed, ts.time/float(1000))
-					write_frame_snapshot(loc_nb_frames_processed, ts.time/float(1000))
-					write_frame_annotation(loc_nb_frames_processed, ts.time/float(1000))
-				loc_nb_frames_processed+=1
-		
-		#case: frames after specified time boundaries
-		#---------------------------------------------
-		elif ts.time/float(1000)>args.t_end:
-			break
-
-	print ''
-
-	return
 def write_xtc_annotation():
 	
 	#sizes
-	#=====
+	#-----
 	#create file
-	filename_details=os.getcwd() + '/' + str(args.output_folder) + '/4_VMD/' + args.xtcfilename[:-4] + '_annotated_clustprot_sizes.txt'
+	filename_details = os.getcwd() + '/' + str(args.output_folder) + '/4_VMD/' + args.xtcfilename[:-4] + '_annotated_clustprot_sizes.txt'
 	output_stat = open(filename_details, 'w')		
 
 	#output VMD protein selection line
-	tmp_prot_sele=proteins_sele_string_VMD[0]
-	for p_index in range(1,proteins_nb):
-		tmp_prot_sele+="." + proteins_sele_string_VMD[p_index]
-	output_stat.write(tmp_prot_sele + "\n")
+	tmp_prot_sele = ""
+	for p_index in range(0,proteins_nb):
+		tmp_prot_sele += "." + proteins_sele_string_VMD[p_index]
+	output_stat.write(tmp_prot_sele[1:] + "\n")
 	
 	#ouput min and max size
-	output_stat.write(str(min(proteins_sizes_sampled)) + "." + str(max(proteins_sizes_sampled)) + "\n")
+	output_stat.write(str(min(cluster_sizes_sampled)) + "." + str(max(cluster_sizes_sampled)) + "\n")
 	
 	#ouptut cluster size for each protein
-	proteins_cluster_size_mat=numpy.asarray(proteins_cluster_size.values())
-	for frame in sorted(time_stamp.iterkeys()):
-		tmp_sizes=str(frame)
-		frame_index=sorted(time_stamp.keys()).index(frame)
+	for f_index in range(0,nb_frames_to_process):
+		tmp_sizes = str(frames_nb[f_index])
 		for p_index in range(0,proteins_nb):
-			tmp_sizes+="." + str(proteins_cluster_size_mat[p_index,frame_index])
+			tmp_sizes += "." + str(proteins_cluster_status_sizes[p_index,frame_index])
 		output_stat.write(tmp_sizes + "\n")
 	output_stat.close()
 	
 	#groups
-	#======
-	if args.cluster_groups_file!="no":
+	#------
+	if args.cluster_groups_file != "no":
 		#create file
-		filename_details=os.getcwd() + '/' + str(args.output_folder) + '/4_VMD/' + args.xtcfilename[:-4] + '_annotated_clustprot_groups.txt'
+		filename_details = os.getcwd() + '/' + str(args.output_folder) + '/4_VMD/' + args.xtcfilename[:-4] + '_annotated_clustprot_groups.txt'
 		output_stat = open(filename_details, 'w')		
 	
 		#output VMD protein selection line
-		tmp_prot_sele=proteins_sele_string_VMD[0]
-		for p_index in range(1,proteins_nb):
-			tmp_prot_sele+="." + proteins_sele_string_VMD[p_index]
-		output_stat.write(tmp_prot_sele + "\n")
+		for p_index in range(0,proteins_nb):
+			tmp_prot_sele += "." + proteins_sele_string_VMD[p_index]
+		output_stat.write(tmp_prot_sele[1:] + "\n")
 		
 		#ouput min and max size
-		output_stat.write(str(min(proteins_groups_sampled)) + "." + str(max(proteins_groups_sampled)) + "\n")
+		output_stat.write(str(min(cluster_groups_sampled)) + "." + str(max(cluster_groups_sampled)) + "\n")
 		
 		#ouptut cluster size for each protein
-		proteins_cluster_group_mat=numpy.asarray(proteins_cluster_group.values())
-		for frame in sorted(time_stamp.iterkeys()):
-			tmp_groups=str(frame)
-			frame_index=sorted(time_stamp.keys()).index(frame)
+		for f_index in range(0,nb_frames_to_process):
+			tmp_groups = str(frames_nb[f_index])
 			for p_index in range(0,proteins_nb):
-				tmp_groups+="." + str(proteins_cluster_group_mat[p_index,frame_index])
-			output_stat.write(tmp_groups + "\n")
+				tmp_groups += "." + str(proteins_cluster_status_groups[p_index,frame_index])
+				output_stat.write(tmp_groups + "\n")
 		output_stat.close()
 
 	return
@@ -2458,26 +2445,18 @@ if args.xtcfilename == "no":
 	frames_time[0] = 0
 
 	#detect clusters
+	#---------------
 	if args.m_algorithm != "density":
-		tmp_groups = detect_clusters_connectivity(get_distances(U.trajectory.ts.dimensions), U.dimensions)
+		clusters = detect_clusters_connectivity(get_distances(U.trajectory.ts.dimensions), U.dimensions)
 	else:
-		tmp_groups = detect_clusters_density(get_distances(U.trajectory.ts.dimensions), U.dimensions)
+		clusters = detect_clusters_density(get_distances(U.trajectory.ts.dimensions), U.dimensions)
 	
-	#case: store cluster size only for each lipd
-	if args.cluster_groups_file == "no":
-		for g in tmp_groups:
-			c_size = numpy.size(g)
-			for p_index in g:
-				proteins_cluster_status_sizes[p_index, f_index] = c_size
-
-	#case: store cluster size and group size for each lipd
+	#assign current cluster status
+	#-----------------------------
+	if args.cutoff_leaflet == "no":
+		process_clusters(clusters)
 	else:
-		for g in tmp_groups:
-			c_size = numpy.size(g)
-			g_index = groups_sizes_dict[c_size]
-			for p_index in g:
-				proteins_cluster_status_sizes[p_index, f_index] = c_size
-				proteins_cluster_status_groups[p_index, f_index] = g_index
+		process_clusters_TM(clusters)
 			
 #case: xtc file
 #==============
@@ -2495,6 +2474,7 @@ else:
 		f_nb = ts.frame
 		frames_nb[f_index] = f_nb
 		frames_time[f_index] = f_time
+		f_write = frames_to_write[f_index]
 
 		#detect clusters
 		#---------------
@@ -2503,80 +2483,21 @@ else:
 		else:
 			clusters = detect_clusters_density(get_distances(U.trajectory.ts.dimensions), U.dimensions)
 		
-		#case: check TM status
-		#---------------------
-		if args.cutoff_leaflet != "no":
-			#store cluster size only for each protein
-			if args.cluster_groups_file == "no":			
-				for cluster in clusters:
-					c_size = numpy.size(cluster)
-	
-					#create selection for current cluster
-					c_sele = MDAnalysis.core.AtomGroup.AtomGroup([])	
-					for p_index in cluster:
-						c_sele += proteins_sele[p_index]
-					
-					#find closest PO4 particles for each particles of clusters, if all are in the same leaflet then it's surfacic [NB: this is done at the CLUSTER level (the same criteria at the protein level would probably fail)]
-					dist_min_lower = numpy.min(MDAnalysis.analysis.distances.distance_array(c_sele.coordinates(), tmp_lip_coords["lower"], U.trajectory.ts.dimensions), axis = 1)
-					dist_min_upper = numpy.min(MDAnalysis.analysis.distances.distance_array(c_sele.coordinates(), tmp_lip_coords["upper"], U.trajectory.ts.dimensions), axis = 1)
-					dist = dist_min_upper - dist_min_lower
-					   
-					#case: interfacial lower
-					if numpy.size(dist[dist>0]) == numpy.size(dist):
-						proteins_cluster_status_sizes[cluster, f_index] = -1
-					#case: interfacial upper
-					elif numpy.size(dist[dist>0]) == 0:
-						proteins_cluster_status_sizes[cluster, f_index] = 0
-					#case: TM
-					else:
-						proteins_cluster_status_sizes[cluster, f_index] = c_size				
-
-			#store cluster size and group size for protein
-			else:
-				for cluster in clusters:
-					c_size = numpy.size(cluster)
-					g_index = groups_sizes_dict[c_size]
-	
-					#create selection for current cluster
-					c_sele = MDAnalysis.core.AtomGroup.AtomGroup([])	
-					for p_index in cluster:
-						c_sele += proteins_sele[p_index]
-					
-					#find closest PO4 particles for each particles of clusters, if all are in the same leaflet then it's surfacic [NB: this is done at the CLUSTER level (the same criteria at the protein level would probably fail)]
-					dist_min_lower = numpy.min(MDAnalysis.analysis.distances.distance_array(c_sele.coordinates(), tmp_lip_coords["lower"], U.trajectory.ts.dimensions), axis = 1)
-					dist_min_upper = numpy.min(MDAnalysis.analysis.distances.distance_array(c_sele.coordinates(), tmp_lip_coords["upper"], U.trajectory.ts.dimensions), axis = 1)
-					dist = dist_min_upper - dist_min_lower
-					   
-					#case: interfacial lower
-					if numpy.size(dist[dist>0]) == numpy.size(dist):
-						proteins_cluster_status_sizes[cluster, f_index] = -1
-						proteins_cluster_status_groups[cluster, f_index] = groups_number + 1 
-					#case: interfacial upper
-					elif numpy.size(dist[dist>0]) == 0:
-						proteins_cluster_status_sizes[cluster, f_index] = 0
-						proteins_cluster_status_groups[cluster, f_index] = groups_number + 2 
-					#case: TM
-					else:
-						proteins_cluster_status_sizes[cluster, f_index] = c_size				
-						proteins_cluster_status_groups[cluster, f_index] = g_index
-		
-		#case: do not check TM status
-		#----------------------------
+		#assign current cluster status
+		#-----------------------------
+		if args.cutoff_leaflet == "no":
+			process_clusters(clusters)
 		else:
-			#store cluster size only for each protein
-			if args.cluster_groups_file == "no":
-				for cluster in clusters:
-					c_size = numpy.size(cluster)
-					proteins_cluster_status_sizes[cluster, f_index] = c_size
-	
-			#store cluster size and group size for protein
-			else:
-				for cluster in clusters:
-					c_size = numpy.size(cluster)
-					g_index = groups_sizes_dict[c_size]
-					proteins_cluster_status_sizes[cluster, f_index] = c_size
-					proteins_cluster_status_groups[cluster, f_index] = g_index
-									
+			process_clusters_TM(clusters)
+			
+		#output results
+		#--------------
+		if f_write:
+			print "  (writing snapshot...)
+			write_frame_stat(f_nb, f_index, f_time)
+			write_frame_snapshot(f_index, f_time)
+			write_frame_annotation(f_index, f_time)
+
 	print ""
 
 #=========================================================================================
@@ -2596,30 +2517,30 @@ print "\nWriting outputs..."
 
 #case: gro file
 #==============
-if args.xtcfilename=="no":
-	if len(proteins_sizes_sampled)>1:
+if args.xtcfilename == "no":
+	if len(cluster_sizes_sampled)>1:
 		print " -writing statistics..."
-		write_frame_stat(1,"all","all")
+		write_frame_stat("all", 0, 0)
 		print " -writing annotated pdb..."
-		write_frame_snapshot(0,0)
-		write_frame_annotation(0,0)
+		write_frame_snapshot(0, 0)
+		write_frame_annotation(0, 0)
 	else:
 		print "\n"
-		print "Warning: a single cluster size (", str(proteins_sizes_sampled[0]), ") was detected throughout the trajectory. Check the --algorithm, --cutoff, --radius or --neighbours options (see cluster_prot -h)."
+		print "Warning: a single cluster size (", str(cluster_sizes_sampled[0]), ") was detected throughout the trajectory. Check the --algorithm, --cutoff, --radius or --neighbours options (see cluster_prot -h)."
 		write_warning()
 
 #case: xtc file
 #==============
 else:
-	if len(proteins_sizes_sampled)>1:
+	if len(cluster_sizes_sampled)>1:
 		#writing statistics
 		print " -writing statistics..."
-		write_frame_stat(1,"all","all")
-		#output cluster snaphots
-		write_xtc_snapshots()
+		write_frame_stat("all", 0, 0)
+				
 		#write annotation files for VMD
 		print " -writing VMD annotation files..."
 		write_xtc_annotation()
+		
 		#write xvg and graphs
 		print " -writing xvg and graphs..."
 		graph_aggregation_2D_sizes()
@@ -2627,22 +2548,22 @@ else:
 		graph_xvg_biggest()
 		write_xvg_sizes()
 		graph_xvg_sizes()
-		if args.nb_smoothing>1:
+		if args.nb_smoothing > 1:
 			write_xvg_sizes_smoothed()
 			graph_xvg_sizes_smoothed()
 			write_xvg_cluster_biggest_smoothed()
 			graph_xvg_cluster_biggest_smoothed()
-		if args.cluster_groups_file!="no":
+		if args.cluster_groups_file != "no":
 			graph_aggregation_2D_groups()
 			write_stability_groups()
 			write_xvg_groups()
 			graph_xvg_groups()
-			if args.nb_smoothing>1:
+			if args.nb_smoothing > 1:
 				write_xvg_groups_smoothed()
 				graph_xvg_groups_smoothed()
 	else:
 		print "\n"
-		print "Warning: a single cluster size (", str(proteins_sizes_sampled[0]), ") was detected throughout the trajectory. Check the -m, -c, -r or -n options (see cluster_prot -h)."
+		print "Warning: a single cluster size (", str(cluster_sizes_sampled[0]), ") was detected throughout the trajectory, maybe check the cluster detection options (see cluster_prot -h)."
 		write_warning()
 		
 #exit
