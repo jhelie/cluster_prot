@@ -26,5 +26,5 @@ features
 
 To do
 -----
-- fix colour bar on 2D plot
+- check groups?
 
