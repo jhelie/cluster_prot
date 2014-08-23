@@ -1172,7 +1172,7 @@ def process_clusters_TM(clusters, f_index, box_dim):					#DONE
 				proteins_cluster_status_sizes[cluster, f_index] = -1
 			#case: interfacial upper
 			elif np.size(dist[dist>0]) == 0:
-				proteins_cluster_status_sizes[cluster, f_index] = proteins_nb+1
+				proteins_cluster_status_sizes[cluster, f_index] = 99999
 			#case: TM
 			else:
 				proteins_cluster_status_sizes[cluster, f_index] = c_size				
@@ -1200,7 +1200,7 @@ def process_clusters_TM(clusters, f_index, box_dim):					#DONE
 				proteins_cluster_status_groups[cluster, f_index] = -1
 			#case: interfacial upper
 			elif np.size(dist[dist>0]) == 0:
-				proteins_cluster_status_sizes[cluster, f_index] = proteins_nb+1
+				proteins_cluster_status_sizes[cluster, f_index] = 99999
 				proteins_cluster_status_groups[cluster, f_index] = groups_number + 1
 			#case: TM
 			else:
@@ -1240,9 +1240,9 @@ def get_sizes_sampled():												#DONE
 	global cluster_sizes_nb
 	global cluster_sizes_pc
 	cluster_sizes_sampled = sorted(np.unique(proteins_cluster_status_sizes))
-	cluster_TM_sizes_sampled = [c_size for c_size in cluster_sizes_sampled if (c_size != -1 and c_size != proteins_nb+1)]
-	cluster_sizes_nb = {c_size: np.zeros(nb_frames_to_process) for c_size in cluster_sizes_sampled + [-1,proteins_nb+1]}
-	cluster_sizes_pc = {c_size: np.zeros(nb_frames_to_process) for c_size in cluster_sizes_sampled + [-1,proteins_nb+1]}
+	cluster_TM_sizes_sampled = [c_size for c_size in cluster_sizes_sampled if (c_size != -1 and c_size != 99999)]
+	cluster_sizes_nb = {c_size: np.zeros(nb_frames_to_process) for c_size in cluster_sizes_sampled + [-1,99999]}
+	cluster_sizes_pc = {c_size: np.zeros(nb_frames_to_process) for c_size in cluster_sizes_sampled + [-1,99999]}
 
 	if args.cluster_groups_file!="no":
 		global cluster_groups_sampled
@@ -1269,10 +1269,10 @@ def update_color_dict():												#DONE
 		colours_sizes_list.append(colours_sizes_value[c_index])
 	#interfacial proteins on the lower leaflet (prepend -> bottom of colour bar)
 	colours_sizes_dict[-1] = colour_leaflet_lower
-	colours_sizes_list.insert(0, colour_leaflet_lower)
+	#colours_sizes_list.insert(0, colour_leaflet_lower)
 	#interfacial proteins on the upper leaflet (append -> top of colour bar)
-	colours_sizes_dict[proteins_nb+1] = colour_leaflet_upper
-	colours_sizes_list.append(colour_leaflet_upper)
+	colours_sizes_dict[99999] = colour_leaflet_upper
+	#colours_sizes_list.append(colour_leaflet_upper)
 
 	#colours: groups
 	#-------
@@ -1306,12 +1306,12 @@ def calculate_statistics():												#DONE
 		for c_size in cluster_sizes_sampled:
 			tmp_nb = tmp_sizes.count(c_size)
 			tmp_pc = tmp_nb / float(proteins_nb) * 100
-			if c_size != -1 and c_size != proteins_nb+1:					#take into account the cluster size except for interfacial peptides
+			if c_size != -1 and c_size != 99999:					#take into account the cluster size except for interfacial peptides
 				tmp_nb = int(tmp_nb / float(c_size))
 				
 			cluster_sizes_nb[c_size][f_index] = tmp_nb
 			cluster_sizes_pc[c_size][f_index] = tmp_pc
-			if tmp_nb > 0 and c_size > tmp_max_size and c_size != proteins_nb+1:
+			if tmp_nb > 0 and c_size > tmp_max_size and c_size != 99999:
 				tmp_max_nb = tmp_nb
 				tmp_max_pc = tmp_pc
 				tmp_max_size = c_size
@@ -1641,7 +1641,7 @@ def graph_xvg_sizes_TM():												#DONE
 	ax1 = fig.add_subplot(211)
 	p_upper = {}
 	for c_size in cluster_sizes_sampled:
-		if c_size != -1 and c_size != proteins_nb+1:
+		if c_size != -1 and c_size != 99999:
 			p_upper[c_size] = plt.plot(frames_time, cluster_sizes_pc[c_size], color = colours_sizes_dict[c_size], linewidth = 2.0, label = str(int(c_size)))
 	fontP.set_size("small")
 	ax1.legend(prop=fontP)
@@ -1654,7 +1654,7 @@ def graph_xvg_sizes_TM():												#DONE
 	ax2 = fig.add_subplot(212)
 	p_lower = {}
 	for c_size in cluster_sizes_sampled:
-		if c_size != -1 and c_size != proteins_nb+1:
+		if c_size != -1 and c_size != 99999:
 			p_lower[c_size] = plt.plot(frames_time, cluster_sizes_nb[c_size], color = colours_sizes_dict[c_size], linewidth = 2.0, label=str(int(c_size)))
 	fontP.set_size("small")
 	ax2.legend(prop=fontP)
@@ -1664,7 +1664,9 @@ def graph_xvg_sizes_TM():												#DONE
 
 	#save figure
 	#-----------
+	ax1.set_xlim(frames_time[0],frames_time[nb_frames_to_process-1]) 
 	ax1.set_ylim(0, 100)
+	ax2.set_xlim(frames_time[0],frames_time[nb_frames_to_process-1]) 
 	ax2.set_ylim(0, np.max(cluster_sizes_nb.values())+1)
 	ax1.spines['top'].set_visible(False)
 	ax1.spines['right'].set_visible(False)
@@ -1719,12 +1721,12 @@ def write_xvg_sizes_interfacial():										#DONE
 	output_xvg.write("@ s2 legend \"lower (nb)\"\n")
 	output_xvg.write("@ s3 legend \"upper (nb)\"\n")
 	output_txt.write("1_2_clusterprot_1D_interfacial.xvg,1, lower (%)," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[-1])) + "\n")
-	output_txt.write("1_2_clusterprot_1D_interfacial.xvg,2, upper (%)," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[proteins_nb+1])) + "\n")
+	output_txt.write("1_2_clusterprot_1D_interfacial.xvg,2, upper (%)," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[99999])) + "\n")
 	output_txt.write("1_2_clusterprot_1D_interfacial.xvg,3, lower (nb)," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[-1])) + "\n")
-	output_txt.write("1_2_clusterprot_1D_interfacial.xvg,4, upper (nb)," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[proteins_nb+1])) + "\n")
+	output_txt.write("1_2_clusterprot_1D_interfacial.xvg,4, upper (nb)," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[99999])) + "\n")
 	output_txt.close()
 	for f_index in range(0,nb_frames_to_process):
-		results = str(frames_time[f_index]) + "	" + str(round(cluster_sizes_pc[-1][f_index],2)) + "	" + str(round(cluster_sizes_pc[proteins_nb+1][f_index],2)) + "	" + str(round(cluster_sizes_pc[-1][f_index],2)) + "	" + str(round(cluster_sizes_pc[proteins_nb+1][f_index],2))
+		results = str(frames_time[f_index]) + "	" + str(round(cluster_sizes_pc[-1][f_index],2)) + "	" + str(round(cluster_sizes_pc[99999][f_index],2)) + "	" + str(round(cluster_sizes_pc[-1][f_index],2)) + "	" + str(round(cluster_sizes_pc[99999][f_index],2))
 		output_xvg.write(results + "\n")
 	output_xvg.close()
 	
@@ -1745,7 +1747,7 @@ def graph_xvg_sizes_interfacial():										#DONE
 	#------------
 	ax1 = fig.add_subplot(211)
 	p_upper = {}
-	p_upper[proteins_nb+1] = plt.plot(frames_time, cluster_sizes_pc[-1], color = colours_sizes_dict[proteins_nb+1], linewidth = 2.0, label = "upper leaflet")
+	p_upper[99999] = plt.plot(frames_time, cluster_sizes_pc[-1], color = colours_sizes_dict[99999], linewidth = 2.0, label = "upper leaflet")
 	p_upper[-1] = plt.plot(frames_time, cluster_sizes_pc[-1], color = colours_sizes_dict[-1], linewidth = 2.0, label = "lower leaflet")
 	fontP.set_size("small")
 	ax1.legend(prop=fontP)
@@ -1757,7 +1759,7 @@ def graph_xvg_sizes_interfacial():										#DONE
 	#-------------
 	ax2 = fig.add_subplot(212)
 	p_lower = {}
-	p_lower[proteins_nb+1] = plt.plot(frames_time, cluster_sizes_nb[-1], color = colours_sizes_dict[proteins_nb+1], linewidth = 2.0, label = "upper leaflet")
+	p_lower[99999] = plt.plot(frames_time, cluster_sizes_nb[-1], color = colours_sizes_dict[99999], linewidth = 2.0, label = "upper leaflet")
 	p_lower[-1] = plt.plot(frames_time, cluster_sizes_nb[-1], color = colours_sizes_dict[-1], linewidth = 2.0, label = "lower leaflet")
 	fontP.set_size("small")
 	ax2.legend(prop=fontP)
@@ -1767,7 +1769,9 @@ def graph_xvg_sizes_interfacial():										#DONE
 
 	#save figure
 	#-----------
+	ax1.set_xlim(frames_time[0],frames_time[nb_frames_to_process-1]) 
 	ax1.set_ylim(0, 100)
+	ax2.set_xlim(frames_time[0],frames_time[nb_frames_to_process-1]) 
 	ax2.set_ylim(0, np.max(cluster_sizes_nb.values())+1)
 	ax1.spines['top'].set_visible(False)
 	ax1.spines['right'].set_visible(False)
@@ -1871,9 +1875,9 @@ def graph_xvg_sizes_smoothed():											#DONE
 	#-----------
 	ax1.set_ylim(0, 100)
 	ax2.set_ylim(0, max(max(cluster_sizes_nb_smoothed.values()))+1)
-	ax1.xaxis.set_major_locator(MaxNLocator(nbins=5))
+	ax1.xaxis.set_major_locator(MaxNLocator(nbins=7))
 	ax1.yaxis.set_major_locator(MaxNLocator(nbins=5))
-	ax2.xaxis.set_major_locator(MaxNLocator(nbins=5))
+	ax2.xaxis.set_major_locator(MaxNLocator(nbins=7))
 	ax2.yaxis.set_major_locator(MaxNLocator(integer=True, nbins=5))
 	plt.setp(ax1.xaxis.get_majorticklabels(), fontsize="small" )
 	plt.setp(ax1.yaxis.get_majorticklabels(), fontsize="small" )
@@ -1885,7 +1889,7 @@ def graph_xvg_sizes_smoothed():											#DONE
 	plt.close()
 
 	return
-def graph_aggregation_2D_sizes():										#TO CHECK
+def graph_aggregation_2D_sizes():										#DONE
 
 	#create filenames
 	filename_png = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_1_plots_2D/png/1_1_clusterprot_2D.png'
@@ -1908,7 +1912,7 @@ def graph_aggregation_2D_sizes():										#TO CHECK
 		cb_ticks_lab.append(str(c))
 	if args.cutoff_leaflet != "no":
 		cb_ticks_lab.append("upper")
-	bounds.append(sorted(colours_sizes_dict.iterkeys())[-1]+0.5)	
+	bounds.append(colours_sizes_range[1]+0.5)	
 	norm = mpl.colors.BoundaryNorm(bounds, color_map.N)
 				
 	#create figure ('norm' requires at least 2 elements to work)
@@ -1942,15 +1946,22 @@ def graph_aggregation_2D_sizes():										#TO CHECK
 	#format axes
 	ax_plot.xaxis.set_label_position('bottom') 
 	ax_plot.xaxis.set_ticks_position('bottom')
+	ax_plot.set_xlabel("time (ns)", fontsize = "medium")
+	plt.setp(ax_plot.xaxis.get_majorticklabels(), fontsize = "small" )
+	ax_plot.set_xlim(0,nb_frames_to_process-1) 
+	ax_plot.xaxis.set_major_locator(MaxNLocator(nbins=5))
+	xlabel = ax_plot.get_xticks().tolist()
+	for tick_index in range(0,len(xlabel)):
+		xlabel[tick_index] = int(frames_time[int(xlabel[tick_index])])
+	ax_plot.set_xticklabels(xlabel)
+	
 	ax_plot.yaxis.set_ticks_position('left')
 	ax_plot.get_yaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x,p: '{0:0g}'.format(x+1)))	#increase the index by 1 to get 1-based numbers
-	ax_plot.set_xlabel("time (ns)", fontsize = "medium")
 	ax_plot.set_ylabel("protein #", fontsize = "medium")
-	ax_plot.xaxis.set_major_locator(MaxNLocator(nbins=5))
 	ax_plot.yaxis.set_major_locator(MaxNLocator(prune = 'lower'))	
-	ax_plot.set_title("Evolution of the cluster size in which proteins are involved", fontsize = "medium")
-	plt.setp(ax_plot.xaxis.get_majorticklabels(), fontsize = "small" )
 	plt.setp(ax_plot.yaxis.get_majorticklabels(), fontsize = "small" )
+	
+	ax_plot.set_title("Evolution of the cluster size in which proteins are involved", fontsize = "medium")
 	ax_cbar.set_ylabel('cluster size', fontsize = 'small')
 	
 	#save figure
@@ -2157,8 +2168,7 @@ def graph_xvg_groups_smoothed():
 
 	return
 
-
-def graph_aggregation_2D_groups():
+def graph_aggregation_2D_groups():										#TO CHECK
 	
 	#create filenames
 	filename_png=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_1_plots_2D//png/2_1_clusterprot_2D.png'
@@ -2235,7 +2245,7 @@ def graph_aggregation_2D_groups():
 	plt.close()
 			
 	return
-def write_stability_groups():
+def write_stability_groups():											#TO CHECK
 	
 	filename_details = os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_0_clusterprot_stability.stat'
 	output_stat = open(filename_details, 'w')		
