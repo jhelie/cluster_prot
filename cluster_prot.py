@@ -12,7 +12,7 @@ import os.path
 #=========================================================================================
 # create parser
 #=========================================================================================
-version_nb = "0.1.2-dev4"
+version_nb = "0.1.2-dev5"
 parser = argparse.ArgumentParser(prog='cluster_prot', usage='', add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description=\
 '''
 **********************************************
@@ -162,8 +162,16 @@ The following python modules are needed :
     Colours of individual cluster sizes use the matplotlib 'jet' colour scheme and cannot 
     be modified. 
 
-   (b) Colour of cluster size groups
-    Exact colour control can be achieved by using size groups (see note 7), so if you want
+   (b) Cluster sizes colours
+    Colours of individual cluster sizes use the matplotlib 'jet' colour scheme and cannot 
+    be modified. You need to specify a size range via --colours_sizes on which to apply
+    the colour map (this is because the script does eveything in one pass and cannot guess
+    what the cluster sizes will be in advance).
+     -> '--colours_sizes 2,6'
+    Cluster sizes below the range will use the same colour as that of the lower size and
+    those above the range will use the same colour as that of the upper size.
+
+    Exact colour control can be achieved by using size groups (see note 4), so if you want
     to control individual cluster sizes colours just specify the relevant group file.
 
    (c) Colour definition
@@ -196,8 +204,9 @@ Protein clusters identification
 -----------------------------------------------------
 --groups		: cluster groups definition file, see note 4
 --proteins		: protein selection file, (optional, see note 3)
+--colours_sizes	1,9	: range of cluster sizes to colour, see note 5
 --algorithm	min	: 'cog','min' or 'density', see 'DESCRIPTION'
---nx_cutoff 	8	: networkX cutoff distance for lipid-lipid contact (Angstrom)
+--nx_cutoff 	8	: networkX cutoff distance for protein-protein contact (Angstrom)
 --db_radius 	20	: DBSCAN search radius (Angstrom)
 --db_neighbours	3	: DBSCAN minimum number of neighbours within a circle of radius --db_radius	
  
@@ -221,12 +230,13 @@ parser.add_argument('--smooth', nargs=1, dest='nb_smoothing', default=[0], type=
 #lipids identification
 parser.add_argument('--beads', nargs=1, dest='beadsfilename', default=['no'], help=argparse.SUPPRESS)
 parser.add_argument('--flipflops', nargs=1, dest='selection_file_ff', default=['no'], help=argparse.SUPPRESS)
-parser.add_argument('--leaflets', nargs='?', dest='cutoff_leaflet', const="optimise", default="no", help=argparse.SUPPRESS)
+parser.add_argument('--leaflets', nargs=1, dest='cutoff_leaflet', default=['optimise'], help=argparse.SUPPRESS)
 
 #protein clusters identification
 
 parser.add_argument('--groups', nargs=1, dest='cluster_groups_file', default=['no'], help=argparse.SUPPRESS)
 parser.add_argument('--proteins', nargs=1, dest='selection_file_prot', default=['auto'], help=argparse.SUPPRESS)
+parser.add_argument('--colours_sizes', nargs=1, dest='colours_sizes', default=['1,9'], help=argparse.SUPPRESS)
 parser.add_argument('--algorithm', dest='m_algorithm', choices=['cog','min','density'], default='min', help=argparse.SUPPRESS)
 parser.add_argument('--nx_cutoff', nargs=1, dest='cutoff_connect', default=[8], type=float, help=argparse.SUPPRESS)
 parser.add_argument('--db_radius', nargs=1, dest='dbscan_dist', default=[20], type=float, help=argparse.SUPPRESS)
@@ -261,9 +271,10 @@ args.selection_file_ff = args.selection_file_ff[0]
 #protein clusters identification
 args.cluster_groups_file = args.cluster_groups_file[0]
 args.selection_file_prot = args.selection_file_prot[0]
+args.colours_sizes = args.colours_sizes[0]
+args.cutoff_connect = args.cutoff_connect[0]
 args.dbscan_dist = args.dbscan_dist[0]
 args.dbscan_nb = args.dbscan_nb[0]
-args.cutoff_connect = args.cutoff_connect[0]
 #other options
 args.buffer_size = args.buffer_size[0]
 
@@ -318,9 +329,9 @@ except:
 	print "Error: you need to install the maths module."
 	sys.exit(1)
 try:
-	import numpy
+	import numpy as np
 except:
-	print "Error: you need to install the numpy module."
+	print "Error: you need to install the np module."
 	sys.exit(1)
 try:
 	import scipy
@@ -366,7 +377,7 @@ except:
 if not os.path.isfile(args.grofilename):
 	print "Error: file " + str(args.grofilename) + " not found."
 	sys.exit(1)
-if args.cluster_groups_file! = "no" and not os.path.isfile(args.cluster_groups_file):
+if args.cluster_groups_file != "no" and not os.path.isfile(args.cluster_groups_file):
 	print "Error: file " + str(args.cluster_groups_file) + " not found."
 	sys.exit(1)
 if args.selection_file_ff != "no" and not os.path.isfile(args.selection_file_ff):
@@ -793,6 +804,8 @@ def identify_proteins():												#DONE
 			proteins_sele[p_index] = U.selectAtoms(proteins_sele_string[p_index])
 			output_stat.write(proteins_sele_string[p_index] + "\n")
 		output_stat.close()
+
+	nb_atom_per_protein = proteins_sele[0].numberOfAtoms()
 	print ""
 
 	return
@@ -824,7 +837,7 @@ def identify_leaflets():												#DONE
 		else:
 			L = MDAnalysis.analysis.leaflet.LeafletFinder(U, leaflet_sele_string, args.cutoff_leaflet)
 	
-		if numpy.shape(L.groups())[0]<2:
+		if np.shape(L.groups())[0]<2:
 			print "Error: imposssible to identify 2 leaflets."
 			sys.exit(1)
 		if L.group(0).centerOfGeometry()[2] > L.group(1).centerOfGeometry()[2]:
@@ -834,13 +847,13 @@ def identify_leaflets():												#DONE
 			leaflet_sele["upper"] = L.group(1)
 			leaflet_sele["lower"] = L.group(0)
 		leaflet_sele["both"] = leaflet_sele["lower"] + leaflet_sele["upper"]
-		if numpy.shape(L.groups())[0] == 2:
+		if np.shape(L.groups())[0] == 2:
 			print " -found 2 leaflets: ", leaflet_sele["upper"].numberOfResidues(), '(upper) and ', leaflet_sele["lower"].numberOfResidues(), '(lower) lipids'
 		else:
 			other_lipids=0
-			for g in range(2, numpy.shape(L.groups())[0]):
+			for g in range(2, np.shape(L.groups())[0]):
 				other_lipids += L.group(g).numberOfResidues()
-			print " -found " + str(numpy.shape(L.groups())[0]) + " groups: " + str(leaflet_sele["upper"].numberOfResidues()) + "(upper), " + str(leaflet_sele["lower"].numberOfResidues()) + "(lower) and " + str(other_lipids) + " (others) lipids respectively"
+			print " -found " + str(np.shape(L.groups())[0]) + " groups: " + str(leaflet_sele["upper"].numberOfResidues()) + "(upper), " + str(leaflet_sele["lower"].numberOfResidues()) + "(lower) and " + str(other_lipids) + " (others) lipids respectively"
 	#use cog:
 	else:
 		leaflet_sele["both"] = U.selectAtoms(leaflet_sele_string)
@@ -932,17 +945,17 @@ def initialise_groups():												#DONE
 			groups_sizes_dict[tmp_size] = groups_number
 
 	#check whether a colour map was specified
-	if groups_number > 1 and len(numpy.unique(colours_groups_dict.values())) == 1:
-		if numpy.unique(colours_groups_dict.values())[0] in colormaps_possible:
-			colours_groups_map = numpy.unique(colours_groups_dict.values())[0]
+	if groups_number > 1 and len(np.unique(colours_groups_dict.values())) == 1:
+		if np.unique(colours_groups_dict.values())[0] in colormaps_possible:
+			colours_groups_map = np.unique(colours_groups_dict.values())[0]
 		else:
-			print "Error: either the same color was specified for all groups or the color map '" + str(numpy.unique(colours_groups_dict.values())[0]) + "' is not valid."
+			print "Error: either the same color was specified for all groups or the color map '" + str(np.unique(colours_groups_dict.values())[0]) + "' is not valid."
 			sys.exit(1)
 
 	#generate colours from colour map if necessary
 	if colours_groups_map != "custom":
 		tmp_cmap = cm.get_cmap(colors_groups_map)
-		groups_colors_value = tmp_cmap(numpy.linspace(0, 1, groups_number))
+		groups_colors_value = tmp_cmap(np.linspace(0, 1, groups_number))
 		for g_index in range(0, groups_number):
 			colours_groups_dict[g_index] = groups_colors_value[g_index]
 			colours_groups_list.append(groups_colors_value[g_index])
@@ -972,8 +985,8 @@ def data_struct_time():													#DONE
 
 	global frames_nb
 	global frames_time
-	frames_nb = numpy.zeros(nb_frames_to_process)
-	frames_time = numpy.zeros(nb_frames_to_process)
+	frames_nb = np.zeros(nb_frames_to_process)
+	frames_time = np.zeros(nb_frames_to_process)
 
 	return
 def data_struct_stats():												#DONE
@@ -990,16 +1003,16 @@ def data_struct_stats():												#DONE
 	
 	cluster_sizes_nb = {}
 	cluster_sizes_pc = {}
-	cluster_biggest_nb = numpy.zeros(nb_frames_to_process)
-	cluster_biggest_pc = numpy.zeros(nb_frames_to_process)
-	cluster_biggest_size = numpy.zeros(nb_frames_to_process)
+	cluster_biggest_nb = np.zeros(nb_frames_to_process)
+	cluster_biggest_pc = np.zeros(nb_frames_to_process)
+	cluster_biggest_size = np.zeros(nb_frames_to_process)
 	if args.cluster_groups_file != "no":
 		global cluster_groups_nb
 		global cluster_groups_pc
-		cluster_groups_nb = {g_index: numpy.zeros(nb_frames_to_process) for g_index in range(-1,groups_number + 2)}
-		cluster_groups_pc = {g_index: numpy.zeros(nb_frames_to_process) for g_index in range(-1,groups_number + 2)}
+		cluster_groups_nb = {g_index: np.zeros(nb_frames_to_process) for g_index in range(-1,groups_number + 2)}
+		cluster_groups_pc = {g_index: np.zeros(nb_frames_to_process) for g_index in range(-1,groups_number + 2)}
 
-		if args.xtcfilename != "no"
+		if args.xtcfilename != "no":
 			global proteins_groups_stability
 			proteins_groups_stability = {}
 	
@@ -1013,10 +1026,10 @@ def data_struct_proteins():												#DONE
 	
 	global proteins_cluster_status_sizes
 
-	proteins_cluster_status_sizes = numpy.zeros((proteins_nb, nb_frames_to_process))
+	proteins_cluster_status_sizes = np.zeros((proteins_nb, nb_frames_to_process))
 	if args.cluster_groups_file != "no":
 		global proteins_cluster_status_groups
-		proteins_cluster_status_groups = numpy.zeros((proteins_nb, nb_frames_to_process))
+		proteins_cluster_status_groups = np.zeros((proteins_nb, nb_frames_to_process))
 	
 	return
 		
@@ -1043,8 +1056,8 @@ def get_distances(box_dim):												#DONE
 	#method: use distance between cog
 	#--------------------------------
 	else:
-		tmp_proteins_cogs = numpy.asarray(map(lambda p_index: calculate_cog(proteins_sele[p_index], box_dim), range(0,proteins_nb)))
-		dist_matrix = MDAnalysis.analysis.distances.distance_array(numpy.float32(tmp_proteins_cogs), numpy.float32(tmp_proteins_cogs), box_dim)
+		tmp_proteins_cogs = np.asarray(map(lambda p_index: calculate_cog(proteins_sele[p_index], box_dim), range(0,proteins_nb)))
+		dist_matrix = MDAnalysis.analysis.distances.distance_array(np.float32(tmp_proteins_cogs), np.float32(tmp_proteins_cogs), box_dim)
 
 	return dist_matrix
 def calculate_cog(tmp_coords, box_dim):									#DONE
@@ -1078,8 +1091,8 @@ def detect_clusters_density(dist, box_dim):								#DONE
 
 	#build 'groups' structure i.e. a list whose element are all the clusters identified
 	groups = []
-	for c_lab in numpy.unique(dbscan_output.labels_):
-		tmp_pos = numpy.argwhere(dbscan_output.labels_ == c_lab)
+	for c_lab in np.unique(dbscan_output.labels_):
+		tmp_pos = np.argwhere(dbscan_output.labels_ == c_lab)
 		if c_lab == -1:
 			groups += map(lambda p:p[0] , tmp_pos)
 		else:
@@ -1094,14 +1107,14 @@ def process_clusters(clusters, f_index):								#DONE
 	#-----------------------------
 	if args.cluster_groups_file == "no":
 		for cluster in clusters:
-			c_size = numpy.size(cluster)
+			c_size = np.size(cluster)
 			proteins_cluster_status_sizes[cluster, f_index] = c_size
 
 	#case: store cluster size and group size
 	#---------------------------------------
 	else:
 		for cluster in clusters:
-			c_size = numpy.size(cluster)
+			c_size = np.size(cluster)
 			g_index = groups_sizes_dict[c_size]
 			proteins_cluster_status_sizes[cluster, f_index] = c_size
 			proteins_cluster_status_groups[cluster, f_index] = g_index
@@ -1142,7 +1155,7 @@ def process_clusters_TM(clusters, f_index, box_dim):					#DONE
 	#-----------------------------
 	if args.cluster_groups_file == "no":			
 		for cluster in clusters:
-			c_size = numpy.size(cluster)
+			c_size = np.size(cluster)
 
 			#create selection for current cluster
 			c_sele = MDAnalysis.core.AtomGroup.AtomGroup([])	
@@ -1150,16 +1163,16 @@ def process_clusters_TM(clusters, f_index, box_dim):					#DONE
 				c_sele += proteins_sele[p_index]
 			tmp_c_sele_coordinates = c_sele.coordinates()
 			#find closest PO4 particles for each particles of clusters, if all are in the same leaflet then it's surfacic [NB: this is done at the CLUSTER level (the same criteria at the protein level would probably fail)]
-			dist_min_lower = numpy.min(MDAnalysis.analysis.distances.distance_array(tmp_c_sele_coordinates, tmp_lip_coords["lower"], box_dim), axis = 1)
-			dist_min_upper = numpy.min(MDAnalysis.analysis.distances.distance_array(tmp_c_sele_coordinates, tmp_lip_coords["upper"], box_dim), axis = 1)
+			dist_min_lower = np.min(MDAnalysis.analysis.distances.distance_array(tmp_c_sele_coordinates, tmp_lip_coords["lower"], box_dim), axis = 1)
+			dist_min_upper = np.min(MDAnalysis.analysis.distances.distance_array(tmp_c_sele_coordinates, tmp_lip_coords["upper"], box_dim), axis = 1)
 			dist = dist_min_upper - dist_min_lower
 			   
 			#case: interfacial lower
-			if numpy.size(dist[dist>0]) == numpy.size(dist):
+			if np.size(dist[dist>0]) == np.size(dist):
 				proteins_cluster_status_sizes[cluster, f_index] = -1
 			#case: interfacial upper
-			elif numpy.size(dist[dist>0]) == 0:
-				proteins_cluster_status_sizes[cluster, f_index] = proteins_nb
+			elif np.size(dist[dist>0]) == 0:
+				proteins_cluster_status_sizes[cluster, f_index] = proteins_nb+1
 			#case: TM
 			else:
 				proteins_cluster_status_sizes[cluster, f_index] = c_size				
@@ -1168,7 +1181,7 @@ def process_clusters_TM(clusters, f_index, box_dim):					#DONE
 	#---------------------------------------
 	else:
 		for cluster in clusters:
-			c_size = numpy.size(cluster)
+			c_size = np.size(cluster)
 			g_index = groups_sizes_dict[c_size]
 
 			#create selection for current cluster
@@ -1177,17 +1190,17 @@ def process_clusters_TM(clusters, f_index, box_dim):					#DONE
 				c_sele += proteins_sele[p_index]
 			tmp_c_sele_coordinates = c_sele.coordinates()
 			#find closest PO4 particles for each particles of clusters, if all are in the same leaflet then it's surfacic [NB: this is done at the CLUSTER level (the same criteria at the protein level would probably fail)]
-			dist_min_lower = numpy.min(MDAnalysis.analysis.distances.distance_array(tmp_c_sele_coordinates, tmp_lip_coords["lower"], box_dim), axis = 1)
-			dist_min_upper = numpy.min(MDAnalysis.analysis.distances.distance_array(tmp_c_sele_coordinates, tmp_lip_coords["upper"], box_dim), axis = 1)
+			dist_min_lower = np.min(MDAnalysis.analysis.distances.distance_array(tmp_c_sele_coordinates, tmp_lip_coords["lower"], box_dim), axis = 1)
+			dist_min_upper = np.min(MDAnalysis.analysis.distances.distance_array(tmp_c_sele_coordinates, tmp_lip_coords["upper"], box_dim), axis = 1)
 			dist = dist_min_upper - dist_min_lower
 			   
 			#case: interfacial lower
-			if numpy.size(dist[dist>0]) == numpy.size(dist):
+			if np.size(dist[dist>0]) == np.size(dist):
 				proteins_cluster_status_sizes[cluster, f_index] = -1
 				proteins_cluster_status_groups[cluster, f_index] = -1
 			#case: interfacial upper
-			elif numpy.size(dist[dist>0]) == 0:
-				proteins_cluster_status_sizes[cluster, f_index] = proteins_nb
+			elif np.size(dist[dist>0]) == 0:
+				proteins_cluster_status_sizes[cluster, f_index] = proteins_nb+1
 				proteins_cluster_status_groups[cluster, f_index] = groups_number + 1
 			#case: TM
 			else:
@@ -1224,14 +1237,16 @@ def get_sizes_sampled():												#DONE
 		
 	global cluster_sizes_sampled
 	global cluster_TM_sizes_sampled
-	cluster_sizes_sampled = sorted(numpy.unique(proteins_cluster_status_sizes))
-	cluster_TM_sizes_sampled = [c_size for c_size in cluster_sizes_sampled if (c_size != -1 and c_size != proteins_nb)]
-	cluster_sizes_nb = {c_size: numpy.zeros(nb_frames_to_process) for c_size in cluster_sizes_sampled + [-1,proteins_nb]}
-	cluster_sizes_pc = {c_size: numpy.zeros(nb_frames_to_process) for c_size in cluster_sizes_sampled + [-1,proteins_nb]}
+	global cluster_sizes_nb
+	global cluster_sizes_pc
+	cluster_sizes_sampled = sorted(np.unique(proteins_cluster_status_sizes))
+	cluster_TM_sizes_sampled = [c_size for c_size in cluster_sizes_sampled if (c_size != -1 and c_size != proteins_nb+1)]
+	cluster_sizes_nb = {c_size: np.zeros(nb_frames_to_process) for c_size in cluster_sizes_sampled + [-1,proteins_nb+1]}
+	cluster_sizes_pc = {c_size: np.zeros(nb_frames_to_process) for c_size in cluster_sizes_sampled + [-1,proteins_nb+1]}
 
 	if args.cluster_groups_file!="no":
 		global cluster_groups_sampled
-		cluster_groups_sampled = sorted(numpy.unique(proteins_cluster_status_groups))
+		cluster_groups_sampled = sorted(np.unique(proteins_cluster_status_groups))
 		
 	return
 def update_color_dict():												#DONE
@@ -1245,14 +1260,18 @@ def update_color_dict():												#DONE
 	colours_sizes_nb = len(cluster_TM_sizes_sampled)	
 	colours_sizes_dict = {}
 	colours_sizes_list = []
-	tmp_colours_value = plt.cm.jet(numpy.linspace(0, 1, colours_sizes_nb))
-	for c_index in range(0, colours_sizes_nb):
-		c_size = cluster_sizes_sampled[c_index]
-		colours_sizes_dict[c_size] = tmp_colours_value[c_index]
-		colours_sizes_list.append(tmp_colours_value[c_index])
+
+	tmp_cmap = cm.get_cmap('jet')
+	colours_sizes_value = tmp_cmap(np.linspace(0, 1, colours_sizes_range[1]-colours_sizes_range[0]+1))
+	for c_index in range(0, colours_sizes_range[1]-colours_sizes_range[0]+1):
+		c_size = colours_sizes_range[0] + c_index
+		colours_sizes_dict[c_size] = colours_sizes_value[c_index]
+		colours_sizes_list.append(colours_sizes_value[c_index])
 	#interfacial proteins on the lower leaflet (prepend -> bottom of colour bar)
-		colours_sizes_list.insert(0, colour_leaflet_lower)
+	colours_sizes_dict[-1] = colour_leaflet_lower
+	colours_sizes_list.insert(0, colour_leaflet_lower)
 	#interfacial proteins on the upper leaflet (append -> top of colour bar)
+	colours_sizes_dict[proteins_nb+1] = colour_leaflet_upper
 	colours_sizes_list.append(colour_leaflet_upper)
 
 	#colours: groups
@@ -1276,7 +1295,7 @@ def calculate_statistics():												#DONE
 	for f_index in range(0,nb_frames_to_process):
 		
 		#retrieve cluster status of all proteins for current frame
-		tmp_sizes = proteins_cluster_status_sizes[:,f_index]
+		tmp_sizes = list(proteins_cluster_status_sizes[:,f_index])
 		
 		#initialise values for biggest cluster stat (nb,% and size)
 		tmp_max_nb = 0
@@ -1287,13 +1306,12 @@ def calculate_statistics():												#DONE
 		for c_size in cluster_sizes_sampled:
 			tmp_nb = tmp_sizes.count(c_size)
 			tmp_pc = tmp_nb / float(proteins_nb) * 100
-			if c_size != -1 and c_size != proteins_nb:					#take into account the cluster size except for interfacial peptides
+			if c_size != -1 and c_size != proteins_nb+1:					#take into account the cluster size except for interfacial peptides
 				tmp_nb = int(tmp_nb / float(c_size))
-				tmp_pc *= c_size
 				
 			cluster_sizes_nb[c_size][f_index] = tmp_nb
 			cluster_sizes_pc[c_size][f_index] = tmp_pc
-			if tmp_nb > 0 and c_size > tmp_max_size and c_size != proteins_nb:
+			if tmp_nb > 0 and c_size > tmp_max_size and c_size != proteins_nb+1:
 				tmp_max_nb = tmp_nb
 				tmp_max_pc = tmp_pc
 				tmp_max_size = c_size
@@ -1325,10 +1343,10 @@ def calculate_statistics():												#DONE
 	return
 def rolling_avg(loc_list):												#DONE
 	
-	loc_arr=numpy.asarray(loc_list)
+	loc_arr=np.asarray(loc_list)
 	shape=(loc_arr.shape[-1]-args.nb_smoothing+1,args.nb_smoothing)
 	strides=(loc_arr.strides[-1],loc_arr.strides[-1])   	
-	return numpy.average(numpy.lib.stride_tricks.as_strided(loc_arr, shape=shape, strides=strides), -1)
+	return np.average(np.lib.stride_tricks.as_strided(loc_arr, shape=shape, strides=strides), -1)
 def smooth_data():														#DONE
 
 	global frames_time_smoothed
@@ -1534,7 +1552,7 @@ def graph_xvg_cluster_biggest_smoothed():								#DONE
 
 	#save figure
 	#-----------
-	ax1.set_ylim(0, numpy.floor(max(cluster_biggest_size)+2))
+	ax1.set_ylim(0, np.floor(max(cluster_biggest_size)+2))
 	ax2.set_ylim(0, 100)
 	ax1.spines['top'].set_visible(False)
 	ax1.spines['right'].set_visible(False)
@@ -1579,12 +1597,12 @@ def write_xvg_sizes():													#DONE
 	for c_index in range(0,len(cluster_sizes_sampled)):
 		c_size = cluster_sizes_sampled[c_index]
 		output_xvg.write("@ s" + str(c_index) + " legend \"% " + str(c_size) + "\"\n")
-		output_txt.write("1_2_clusterprot_1D.xvg," + str(c_index+1) + ",% " + str(c_size) + "," + mcolors.rgb2hex(colours_sizes_dict[c_size]) + "\n")
+		output_txt.write("1_2_clusterprot_1D.xvg," + str(c_index+1) + ",% " + str(c_size) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[c_size])) + "\n")
 	#write caption: nb
 	for c_index in range(0,len(cluster_sizes_sampled)):
 		c_size = cluster_sizes_sampled[c_index]
 		output_xvg.write("@ s" + str(c) + " legend \"nb " + str(c_size) + "\"\n")
-		output_txt.write("1_2_clusterprot_1D.xvg," + str(len(cluster_sizes_sampled) + c_index + 1) + ",nb " + str(c_size) + "," + mcolors.rgb2hex(colours_sizes_dict[c_size]) + "\n")
+		output_txt.write("1_2_clusterprot_1D.xvg," + str(len(cluster_sizes_sampled) + c_index + 1) + ",nb " + str(c_size) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[c_size])) + "\n")
 	output_txt.close()
 	#write results
 	for f_index in range(0,nb_frames_to_process):
@@ -1636,7 +1654,7 @@ def graph_xvg_sizes():													#DONE
 	#save figure
 	#-----------
 	ax1.set_ylim(0, 100)
-	ax2.set_ylim(0, max(max(cluster_sizes_nb.values()))+1)
+	ax2.set_ylim(0, np.max(cluster_sizes_nb.values())+1)
 	ax1.spines['top'].set_visible(False)
 	ax1.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
@@ -1680,12 +1698,12 @@ def write_xvg_sizes_smoothed():											#DONE
 	for c_index in range(0,len(cluster_sizes_sampled)):
 		c_size = cluster_sizes_sampled[c_index]
 		output_xvg.write("@ s" + str(c_index) + " legend \"% " + str(c_size) + "\"\n")
-		output_txt.write("1_4_clusterprot_1D_smoothed.xvg," + str(c_index+1) + ",% " + str(c_size) + "," + mcolors.rgb2hex(colours_sizes_dict[c_size]) + "\n")
+		output_txt.write("1_4_clusterprot_1D_smoothed.xvg," + str(c_index+1) + ",% " + str(c_size) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[c_size])) + "\n")
 	#write caption: nb
 	for c_index in range(0,len(cluster_sizes_sampled)):
 		c_size = cluster_sizes_sampled[c_index]
 		output_xvg.write("@ s" + str(c) + " legend \"nb " + str(c_size) + "\"\n")
-		output_txt.write("1_4_clusterprot_1D_smoothed.xvg," + str(len(cluster_sizes_sampled) + c_index + 1) + ",nb " + str(c_size) + "," + mcolors.rgb2hex(colours_sizes_dict[c_size]) + "\n")
+		output_txt.write("1_4_clusterprot_1D_smoothed.xvg," + str(len(cluster_sizes_sampled) + c_index + 1) + ",nb " + str(c_size) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[c_size])) + "\n")
 	output_txt.close()
 	#write results
 	for f_index in range(0, len(time_smoothed)):
@@ -1787,7 +1805,7 @@ def graph_aggregation_2D_sizes():										#TO CHECK
 	ax_cbar = fig.add_axes([0.88, 0.1, 0.025, 0.77])
 	if args.cutoff_leaflet != "no":
 		extend_val = "both"
-		boundaries_val = numpy.concatenate([[bounds[0]-1], bounds, [bounds[-1]+1]])
+		boundaries_val = np.concatenate([[bounds[0]-1], bounds, [bounds[-1]+1]])
 	else:
 		extend_val = "neither"
 		boundaries_val = bounds
@@ -1796,7 +1814,7 @@ def graph_aggregation_2D_sizes():										#TO CHECK
 	#position and label color bar ticks
 	cb_ticks_pos = []
 	if args.cutoff_leaflet != "no":
-		cb_ticks_pos.append(bounds[0]
+		cb_ticks_pos.append(bounds[0])
 	for b in range(1,len(bounds)):
 		cb_ticks_pos.append(bounds[b-1]+(bounds[b]-bounds[b-1])/2)
 	if args.cutoff_leaflet != "no":
@@ -1850,12 +1868,12 @@ def write_xvg_groups():
 	for c_index in range(0,len(cluster_groups_sampled)):
 		c_group = cluster_groups_sampled[c_index]
 		output_xvg.write("@ s" + str(c_index) + " legend \"% " + str(c_group) + "\"\n")
-		output_txt.write("1_2_clusterprot_1D.xvg," + str(c_index+1) + ",% " + str(c_group) + "," + mcolors.rgb2hex(colours_groups_dict[c_group]) + "\n")
+		output_txt.write("1_2_clusterprot_1D.xvg," + str(c_index+1) + ",% " + str(c_group) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_groups_dict[c_group])) + "\n")
 	#write caption: nb
 	for c_index in range(0,len(cluster_groups_sampled)):
 		c_group = cluster_groups_sampled[c_index]
 		output_xvg.write("@ s" + str(c) + " legend \"nb " + str(c_group) + "\"\n")
-		output_txt.write("1_2_clusterprot_1D.xvg," + str(len(cluster_groups_sampled) + c_index + 1) + ",nb " + str(c_group) + "," + mcolors.rgb2hex(colours_groups_dict[c_group]) + "\n")
+		output_txt.write("1_2_clusterprot_1D.xvg," + str(len(cluster_groups_sampled) + c_index + 1) + ",nb " + str(c_group) + "," + mcolors.rgb2hex((colours_groups_dict[c_group])) + "\n")
 	output_txt.close()
 	#write results
 	for f_index in range(0,nb_frames_to_process):
@@ -1951,12 +1969,12 @@ def write_xvg_groups_smoothed():
 	for c_index in range(0,len(cluster_groups_sampled)):
 		c_group = cluster_groups_sampled[c_index]
 		output_xvg.write("@ s" + str(c_index) + " legend \"% " + str(c_group) + "\"\n")
-		output_txt.write("2_4_clusterprot_1D_smoothed.xvg," + str(c_index+1) + ",% " + str(c_group) + "," + mcolors.rgb2hex(colours_groups_dict[c_group]) + "\n")
+		output_txt.write("2_4_clusterprot_1D_smoothed.xvg," + str(c_index+1) + ",% " + str(c_group) + "," + mcolors.rgb2hex((colours_groups_dict[c_group])) + "\n")
 	#write caption: nb
 	for c_index in range(0,len(cluster_groups_sampled)):
 		c_group = cluster_groups_sampled[c_index]
 		output_xvg.write("@ s" + str(c) + " legend \"nb " + str(c_group) + "\"\n")
-		output_txt.write("2_4_clusterprot_1D_smoothed.xvg," + str(len(cluster_groups_sampled) + c_index + 1) + ",nb " + str(c_group) + "," + mcolors.rgb2hex(colours_groups_dict[c_group]) + "\n")
+		output_txt.write("2_4_clusterprot_1D_smoothed.xvg," + str(len(cluster_groups_sampled) + c_index + 1) + ",nb " + str(c_group) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_groups_dict[c_group])) + "\n")
 	output_txt.close()
 	#write results
 	for f_index in range(0, len(time_smoothed)):
@@ -2032,9 +2050,9 @@ def graph_aggregation_2D_groups():
 	filename_svg=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_1_plots_2D//2_1_clusterprot_2D.svg'
 
 	#create data
-	lip_2D_evolution=numpy.zeros((proteins_nb,len(time_stamp.keys())))
+	lip_2D_evolution=np.zeros((proteins_nb,len(time_stamp.keys())))
 	for p_index in range(0,proteins_nb):
-		lip_2D_evolution[p_index,:]=numpy.asarray(proteins_cluster_group[p_index])
+		lip_2D_evolution[p_index,:]=np.asarray(proteins_cluster_group[p_index])
 
 	#build color map
 	color_map=mcolors.LinearSegmentedColormap.from_list('custom', colours_groups_list, colours_groups_nb)
@@ -2078,7 +2096,7 @@ def graph_aggregation_2D_groups():
 	xticks_pos=ax_plot.xaxis.get_ticklocs()[1:-1]
 	tmp_xticks_lab=[""]
 	for t in sorted(time_stamp.values()):
-		tmp_xticks_lab.append('{0:0g}'.format(numpy.floor(t)))
+		tmp_xticks_lab.append('{0:0g}'.format(np.floor(t)))
 	xticks_lab=[""]
 	for t in xticks_pos:
 		xticks_lab.append(tmp_xticks_lab[int(t)+1])
@@ -2388,7 +2406,7 @@ def write_frame_annotation(f_index, f_t):								#DONE
 	output_stat.write(tmp_prot_sele[1:] + "\n")
 				
 	#ouput min and max size
-	output_stat.write(str(numpy.min(proteins_cluster_status_sizes[:,f_index])) + "." + str(numpy.max(proteins_cluster_status_sizes[:,f_index])) + "\n")
+	output_stat.write(str(np.min(proteins_cluster_status_sizes[:,f_index])) + "." + str(np.max(proteins_cluster_status_sizes[:,f_index])) + "\n")
 	
 	#ouptut cluster size for each protein
 	tmp_sizes = "1"
@@ -2414,7 +2432,7 @@ def write_frame_annotation(f_index, f_t):								#DONE
 		output_stat.write(tmp_prot_sele[1:] + "\n")
 		
 		#ouput min and max size
-		output_stat.write(str(numpy.min(proteins_cluster_status_groups[:,f_index])) + "." + str(numpy.max(proteins_cluster_status_groups[:,f_index])) + "\n")
+		output_stat.write(str(np.min(proteins_cluster_status_groups[:,f_index])) + "." + str(np.max(proteins_cluster_status_groups[:,f_index])) + "\n")
 		
 		#ouptut cluster size for each protein
 		tmp_groups = "1"
@@ -2560,7 +2578,7 @@ else:
 		#assign current cluster status
 		#-----------------------------
 		if args.cutoff_leaflet == "no":
-			process_clusters(clusters f_index)
+			process_clusters(clusters, f_index)
 		else:
 			process_clusters_TM(clusters, f_index, box_dim)
 			
