@@ -12,7 +12,7 @@ import os.path
 #=========================================================================================
 # create parser
 #=========================================================================================
-version_nb = "0.1.2-dev5"
+version_nb = "0.1.3"
 parser = argparse.ArgumentParser(prog='cluster_prot', usage='', add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description=\
 '''
 **********************************************
@@ -28,7 +28,7 @@ This script calculates the evolution of proteins clustering status.
 It produces 3 outputs ((a) and (b) require --groups to be specified, see note 5):
  (a) 2D plots: time evolution of the cluster size each protein is involved in
  (b) 1D plots: time evolution of the % of protein represented by each group
- (c) stability statistics: max nb of consecutive frames each group existed for
+ (c) stability statistics: max nb of consecutive frames each group existed for [BETA]
 
 The metrics can be calculated for a single frame or for an entire trajectory - and in case
 a trajectory is supplied the data for individual frame snapshots can also be produced at a
@@ -202,7 +202,7 @@ Lipids identification (see note 2)
 
 Protein clusters identification
 -----------------------------------------------------
---groups		: cluster groups definition file, see note 4
+--groups		: cluster groups definition file, see note 4 [BETA]
 --proteins		: protein selection file, (optional, see note 3)
 --colours_sizes	1,9	: range of cluster sizes to colour, see note 5
 --algorithm	min	: 'cog','min' or 'density', see 'DESCRIPTION'
