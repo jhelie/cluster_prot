@@ -1257,7 +1257,7 @@ def update_color_dict():												#DONE
 		
 	#colours: sizes (colours from jet colormap)
 	#-------
-	colours_sizes_nb = len(cluster_TM_sizes_sampled)	
+	colours_sizes_nb = colours_sizes_range[1]-colours_sizes_range[0]+1
 	colours_sizes_dict = {}
 	colours_sizes_list = []
 
@@ -1575,15 +1575,23 @@ def graph_xvg_cluster_biggest_smoothed():								#DONE
 	fig.savefig(filename_svg)
 	plt.close()
 	return
-def write_xvg_sizes():													#DONE
+def write_xvg_sizes_TM():												#DONE
 
-	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/xvg/1_2_clusterprot_1D.txt'
-	filename_xvg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/xvg/1_2_clusterprot_1D.xvg'
+	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/xvg/1_2_clusterprot_1D_TM.txt'
+	filename_xvg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/xvg/1_2_clusterprot_1D_TM.xvg'
 	output_txt = open(filename_txt, 'w')
-	output_txt.write("@[lipid tail order parameters statistics - written by order_param v" + str(version_nb) + "]\n")
-	output_txt.write("@Use this file as the argument of the -c option of the script 'xvg_animate' in order to make a time lapse movie of the data in 1_2_clusterprot_1D.xvg.\n")
+	output_txt.write("# [protein aggregation statistics - written by cluster_prot v" + str(version_nb) + "]\n")
+	output_txt.write("# Use this file as the argument of the -c option of the script 'xvg_animate' in order to make a time lapse movie of the data in 1_2_clusterprot_1D_TM.xvg.\n")
 	output_xvg = open(filename_xvg, 'w')
-	output_xvg.write("@ title \"Number of protein clusters\"\n")
+	output_xvg.write("# [protein aggregation statistics - written by cluster_prot v" + str(version_nb) + "]\n")
+	output_xvg.write("# - proteins detected: " + str(proteins_nb) + "\n")
+	output_xvg.write("# - algorithm chosen: " + str(args.m_algorithm) + "\n")
+	if args.m_algorithm == "density":
+		output_xvg.write("# - search radius: " + str(args.dbscan_dist) + "\n")
+		output_xvg.write("# - nb of neighbours: " + str(args.dbscan_nb) + "\n")
+	else:
+		output_xvg.write("# - cutoff for contact: " + str(args.cutoff_connect) + "\n")
+	output_xvg.write("@ title \"Evolution of protein aggregation\"\n")
 	output_xvg.write("@ xaxis  label \"time (ns)\"\n")
 	output_xvg.write("@ autoscale ONREAD xaxes\n")
 	output_xvg.write("@ TYPE XY\n")
@@ -1592,16 +1600,17 @@ def write_xvg_sizes():													#DONE
 	output_xvg.write("@ legend box on\n")
 	output_xvg.write("@ legend loctype view\n")
 	output_xvg.write("@ legend 0.98, 0.8\n")
+	tmp_minus = 0
 	output_xvg.write("@ legend length " + str(len(cluster_TM_sizes_sampled)*2) + "\n")
 	#write caption: %
-	for c_index in range(0,len(cluster_sizes_sampled)):
-		c_size = cluster_sizes_sampled[c_index]
+	for c_index in range(0,len(cluster_TM_sizes_sampled)):
+		c_size = cluster_TM_sizes_sampled[c_index]
 		output_xvg.write("@ s" + str(c_index) + " legend \"% " + str(c_size) + "\"\n")
 		output_txt.write("1_2_clusterprot_1D.xvg," + str(c_index+1) + ",% " + str(c_size) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[c_size])) + "\n")
 	#write caption: nb
-	for c_index in range(0,len(cluster_sizes_sampled)):
-		c_size = cluster_sizes_sampled[c_index]
-		output_xvg.write("@ s" + str(c) + " legend \"nb " + str(c_size) + "\"\n")
+	for c_index in range(0,len(cluster_TM_sizes_sampled)):
+		c_size = cluster_TM_sizes_sampled[c_index]
+		output_xvg.write("@ s" + str(len(cluster_TM_sizes_sampled) + c_index) + " legend \"nb " + str(c_size) + "\"\n")
 		output_txt.write("1_2_clusterprot_1D.xvg," + str(len(cluster_sizes_sampled) + c_index + 1) + ",nb " + str(c_size) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[c_size])) + "\n")
 	output_txt.close()
 	#write results
@@ -1615,12 +1624,12 @@ def write_xvg_sizes():													#DONE
 	output_xvg.close()
 	
 	return
-def graph_xvg_sizes():													#DONE
+def graph_xvg_sizes_TM():												#DONE
 	
 	#create filenames
 	#----------------
-	filename_png = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/png/1_2_clusterprot_1D.png'
-	filename_svg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/1_2_clusterprot_1D.svg'
+	filename_png = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/png/1_2_clusterprot_1D_TM.png'
+	filename_svg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/1_2_clusterprot_1D_TM.svg'
 
 	#create figure
 	#-------------
@@ -1632,7 +1641,8 @@ def graph_xvg_sizes():													#DONE
 	ax1 = fig.add_subplot(211)
 	p_upper = {}
 	for c_size in cluster_sizes_sampled:
-		p_upper[c_size] = plt.plot(frames_time, cluster_sizes_pc[c_size], color = colours_sizes_dict[c_size], linewidth = 2.0, label = str(c_size))
+		if c_size != -1 and c_size != proteins_nb+1:
+			p_upper[c_size] = plt.plot(frames_time, cluster_sizes_pc[c_size], color = colours_sizes_dict[c_size], linewidth = 2.0, label = str(int(c_size)))
 	fontP.set_size("small")
 	ax1.legend(prop=fontP)
 	plt.title("%", fontsize="small")
@@ -1644,7 +1654,8 @@ def graph_xvg_sizes():													#DONE
 	ax2 = fig.add_subplot(212)
 	p_lower = {}
 	for c_size in cluster_sizes_sampled:
-		p_lower[c_size] = plt.plot(frames_time, cluster_sizes_nb[c_size], color = colours_sizes_dict[c_size], linewidth = 2.0, label=str(c_size))
+		if c_size != -1 and c_size != proteins_nb+1:
+			p_lower[c_size] = plt.plot(frames_time, cluster_sizes_nb[c_size], color = colours_sizes_dict[c_size], linewidth = 2.0, label=str(int(c_size)))
 	fontP.set_size("small")
 	ax2.legend(prop=fontP)
 	plt.title("nb", fontsize="small")
@@ -1677,6 +1688,110 @@ def graph_xvg_sizes():													#DONE
 	plt.close()
 
 	return
+def write_xvg_sizes_interfacial():										#DONE
+
+	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/xvg/1_2_clusterprot_1D_interfacial.txt'
+	filename_xvg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/xvg/1_2_clusterprot_1D_interfacial.xvg'
+	output_txt = open(filename_txt, 'w')
+	output_txt.write("# [protein aggregation statistics - written by cluster_prot v" + str(version_nb) + "]\n")
+	output_txt.write("# Use this file as the argument of the -c option of the script 'xvg_animate' in order to make a time lapse movie of the data in 1_2_clusterprot_1D_interfacial.xvg.\n")
+	output_xvg = open(filename_xvg, 'w')
+	output_xvg.write("# [protein aggregation statistics - written by cluster_prot v" + str(version_nb) + "]\n")
+	output_xvg.write("# - proteins detected: " + str(proteins_nb) + "\n")
+	output_xvg.write("# - algorithm chosen: " + str(args.m_algorithm) + "\n")
+	if args.m_algorithm == "density":
+		output_xvg.write("# - search radius: " + str(args.dbscan_dist) + "\n")
+		output_xvg.write("# - nb of neighbours: " + str(args.dbscan_nb) + "\n")
+	else:
+		output_xvg.write("# - cutoff for contact: " + str(args.cutoff_connect) + "\n")
+	output_xvg.write("@ title \"Evolution of the number of interfacial proteins\"\n")
+	output_xvg.write("@ xaxis  label \"time (ns)\"\n")
+	output_xvg.write("@ autoscale ONREAD xaxes\n")
+	output_xvg.write("@ TYPE XY\n")
+	output_xvg.write("@ view 0.15, 0.15, 0.95, 0.85\n")
+	output_xvg.write("@ legend on\n")
+	output_xvg.write("@ legend box on\n")
+	output_xvg.write("@ legend loctype view\n")
+	output_xvg.write("@ legend 0.98, 0.8\n")
+	output_xvg.write("@ legend length 4\n")
+	output_xvg.write("@ s0 legend \"lower (%)\"\n")
+	output_xvg.write("@ s1 legend \"upper (%)\"\n")
+	output_xvg.write("@ s2 legend \"lower (nb)\"\n")
+	output_xvg.write("@ s3 legend \"upper (nb)\"\n")
+	output_txt.write("1_2_clusterprot_1D_interfacial.xvg,1, lower (%)," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[-1])) + "\n")
+	output_txt.write("1_2_clusterprot_1D_interfacial.xvg,2, upper (%)," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[proteins_nb+1])) + "\n")
+	output_txt.write("1_2_clusterprot_1D_interfacial.xvg,3, lower (nb)," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[-1])) + "\n")
+	output_txt.write("1_2_clusterprot_1D_interfacial.xvg,4, upper (nb)," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[proteins_nb+1])) + "\n")
+	output_txt.close()
+	for f_index in range(0,nb_frames_to_process):
+		results = str(frames_time[f_index]) + "	" + str(round(cluster_sizes_pc[-1][f_index],2)) + "	" + str(round(cluster_sizes_pc[proteins_nb+1][f_index],2)) + "	" + str(round(cluster_sizes_pc[-1][f_index],2)) + "	" + str(round(cluster_sizes_pc[proteins_nb+1][f_index],2))
+		output_xvg.write(results + "\n")
+	output_xvg.close()
+	
+	return
+def graph_xvg_sizes_interfacial():										#DONE
+	
+	#create filenames
+	#----------------
+	filename_png = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/png/1_2_clusterprot_1D_interfacial.png'
+	filename_svg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/1_2_clusterprot_1D_interfacial.svg'
+
+	#create figure
+	#-------------
+	fig = plt.figure(figsize=(8, 6.2))
+	fig.suptitle("Evolution of proteins distribution")
+		
+	#plot data: %
+	#------------
+	ax1 = fig.add_subplot(211)
+	p_upper = {}
+	p_upper[proteins_nb+1] = plt.plot(frames_time, cluster_sizes_pc[-1], color = colours_sizes_dict[proteins_nb+1], linewidth = 2.0, label = "upper leaflet")
+	p_upper[-1] = plt.plot(frames_time, cluster_sizes_pc[-1], color = colours_sizes_dict[-1], linewidth = 2.0, label = "lower leaflet")
+	fontP.set_size("small")
+	ax1.legend(prop=fontP)
+	plt.title("%", fontsize="small")
+	plt.xlabel('time (ns)', fontsize="small")
+	plt.ylabel('% of proteins', fontsize="small")
+
+	#plot data: nb
+	#-------------
+	ax2 = fig.add_subplot(212)
+	p_lower = {}
+	p_lower[proteins_nb+1] = plt.plot(frames_time, cluster_sizes_nb[-1], color = colours_sizes_dict[proteins_nb+1], linewidth = 2.0, label = "upper leaflet")
+	p_lower[-1] = plt.plot(frames_time, cluster_sizes_nb[-1], color = colours_sizes_dict[-1], linewidth = 2.0, label = "lower leaflet")
+	fontP.set_size("small")
+	ax2.legend(prop=fontP)
+	plt.title("nb", fontsize="small")
+	plt.xlabel('time (ns)', fontsize="small")
+	plt.ylabel('nb of clusters', fontsize="small")
+
+	#save figure
+	#-----------
+	ax1.set_ylim(0, 100)
+	ax2.set_ylim(0, np.max(cluster_sizes_nb.values())+1)
+	ax1.spines['top'].set_visible(False)
+	ax1.spines['right'].set_visible(False)
+	ax2.spines['top'].set_visible(False)
+	ax2.spines['right'].set_visible(False)
+	ax1.xaxis.set_ticks_position('bottom')
+	ax1.yaxis.set_ticks_position('left')
+	ax2.xaxis.set_ticks_position('bottom')
+	ax2.yaxis.set_ticks_position('left')
+	ax1.xaxis.set_major_locator(MaxNLocator(nbins=5))
+	ax1.yaxis.set_major_locator(MaxNLocator(nbins=5))
+	ax2.xaxis.set_major_locator(MaxNLocator(nbins=5))
+	ax2.yaxis.set_major_locator(MaxNLocator(nbins=5))
+	plt.setp(ax1.xaxis.get_majorticklabels(), fontsize="small" )
+	plt.setp(ax1.yaxis.get_majorticklabels(), fontsize="small" )
+	plt.setp(ax2.xaxis.get_majorticklabels(), fontsize="small" )
+	plt.setp(ax2.yaxis.get_majorticklabels(), fontsize="small" )	
+	plt.subplots_adjust(top=0.9, bottom=0.07, hspace=0.37, left=0.09, right=0.96)
+	fig.savefig(filename_png)
+	fig.savefig(filename_svg)
+	plt.close()
+
+	return
+
 def write_xvg_sizes_smoothed():											#DONE
 	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_4_plots_1D_smoothed/xvg/1_4_clusterprot_1D_smoothed.txt'
 	output_txt = open(filename_txt, 'w')
@@ -1773,8 +1888,8 @@ def graph_xvg_sizes_smoothed():											#DONE
 def graph_aggregation_2D_sizes():										#TO CHECK
 
 	#create filenames
-	filename_png = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_1_plots_2D//png/1_1_clusterprot_2D.png'
-	filename_svg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_1_plots_2D//1_1_clusterprot_2D.svg'
+	filename_png = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_1_plots_2D/png/1_1_clusterprot_2D.png'
+	filename_svg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_1_plots_2D/1_1_clusterprot_2D.svg'
 
 	#build color map
 	color_map = mcolors.LinearSegmentedColormap.from_list('custom', colours_sizes_list, colours_sizes_nb)
@@ -1788,7 +1903,7 @@ def graph_aggregation_2D_sizes():										#TO CHECK
 	cb_ticks_lab = []
 	if args.cutoff_leaflet != "no":
 		cb_ticks_lab.append("lower")
-	for c in sorted(colours_sizes_dict.iterkeys()):
+	for c in range(colours_sizes_range[0],colours_sizes_range[1]+1):
 		bounds.append(c-0.5)
 		cb_ticks_lab.append(str(c))
 	if args.cutoff_leaflet != "no":
@@ -2647,8 +2762,10 @@ else:
 		graph_aggregation_2D_sizes()
 		write_xvg_biggest()
 		graph_xvg_biggest()
-		write_xvg_sizes()
-		graph_xvg_sizes()
+		write_xvg_sizes_TM()
+		graph_xvg_sizes_TM()
+		write_xvg_sizes_interfacial()
+		graph_xvg_sizes_interfacial()
 		if args.nb_smoothing > 1:
 			write_xvg_sizes_smoothed()
 			graph_xvg_sizes_smoothed()
