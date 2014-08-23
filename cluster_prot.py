@@ -1953,8 +1953,8 @@ def graph_aggregation_2D_sizes():										#DONE
 	xlabel = ax_plot.get_xticks().tolist()
 	for tick_index in range(0,len(xlabel)):
 		f_index = int(xlabel[tick_index])
-		if f_index == nb_frames_to_process:
-			f_index -= 1
+		if f_index > nb_frames_to_process-1:
+			f_index = nb_frames_to_process-1
 		xlabel[tick_index] = int(frames_time[f_index])
 	ax_plot.set_xticklabels(xlabel)
 	
