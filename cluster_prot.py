@@ -1747,7 +1747,7 @@ def graph_xvg_sizes_interfacial():										#DONE
 	#------------
 	ax1 = fig.add_subplot(211)
 	p_upper = {}
-	p_upper[99999] = plt.plot(frames_time, cluster_sizes_pc[-1], color = colours_sizes_dict[99999], linewidth = 2.0, label = "upper leaflet")
+	p_upper[99999] = plt.plot(frames_time, cluster_sizes_pc[99999], color = colours_sizes_dict[99999], linewidth = 2.0, label = "upper leaflet")
 	p_upper[-1] = plt.plot(frames_time, cluster_sizes_pc[-1], color = colours_sizes_dict[-1], linewidth = 2.0, label = "lower leaflet")
 	fontP.set_size("small")
 	ax1.legend(prop=fontP)
@@ -1759,7 +1759,7 @@ def graph_xvg_sizes_interfacial():										#DONE
 	#-------------
 	ax2 = fig.add_subplot(212)
 	p_lower = {}
-	p_lower[99999] = plt.plot(frames_time, cluster_sizes_nb[-1], color = colours_sizes_dict[99999], linewidth = 2.0, label = "upper leaflet")
+	p_lower[99999] = plt.plot(frames_time, cluster_sizes_nb[99999], color = colours_sizes_dict[99999], linewidth = 2.0, label = "upper leaflet")
 	p_lower[-1] = plt.plot(frames_time, cluster_sizes_nb[-1], color = colours_sizes_dict[-1], linewidth = 2.0, label = "lower leaflet")
 	fontP.set_size("small")
 	ax2.legend(prop=fontP)
@@ -1952,7 +1952,10 @@ def graph_aggregation_2D_sizes():										#DONE
 	ax_plot.xaxis.set_major_locator(MaxNLocator(nbins=5))
 	xlabel = ax_plot.get_xticks().tolist()
 	for tick_index in range(0,len(xlabel)):
-		xlabel[tick_index] = int(frames_time[int(xlabel[tick_index])])
+		f_index = int(xlabel[tick_index])
+		if f_index == nb_frames_to_process:
+			f_index -= 1
+		xlabel[tick_index] = int(frames_time[f_index])
 	ax_plot.set_xticklabels(xlabel)
 	
 	ax_plot.yaxis.set_ticks_position('left')
@@ -1965,8 +1968,8 @@ def graph_aggregation_2D_sizes():										#DONE
 	ax_cbar.set_ylabel('cluster size', fontsize = 'small')
 	
 	#save figure
-	fig.savefig(filename_png)
-	fig.savefig(filename_svg)
+	fig.savefig(filename_png, transparent = True)
+	fig.savefig(filename_svg, transparent = True)
 	plt.close()
 			
 	return
