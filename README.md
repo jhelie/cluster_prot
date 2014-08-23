@@ -27,6 +27,4 @@ features
 To do
 -----
 - fix colour bar on 2D plot
-- remove upper and lower surfacic from the 1D plot and plot them separately (see below!)
-- plot evolution of surfacic peptides (2 graphs (nb and \%) with 2 lines (lower and upper, using the correct colour coding))
 
