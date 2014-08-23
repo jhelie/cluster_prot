@@ -27,5 +27,5 @@ features
 To do
 -----
 - plotting
-
+- xvg/txt numbering
 
