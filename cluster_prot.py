@@ -1304,7 +1304,7 @@ def calculate_statistics():												#DONE
 		#initialise values for biggest cluster stat (nb,% and size)
 		tmp_max_nb = 0
 		tmp_max_pc = 0
-		tmp_max_size = float("-inf")
+		tmp_max_size = 0
 		
 		#store current frame statistics for each size ever sampled
 		for c_size in cluster_sizes_sampled:
