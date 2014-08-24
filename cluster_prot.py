@@ -1315,7 +1315,7 @@ def calculate_statistics():												#DONE
 				
 			cluster_sizes_nb[c_size][f_index] = tmp_nb
 			cluster_sizes_pc[c_size][f_index] = tmp_pc
-			if tmp_nb > 0 and c_size > tmp_max_size and c_size != 99999:
+			if tmp_nb > 0 and c_size > tmp_max_size and c_size != -1 and c_size != 99999:
 				tmp_max_nb = tmp_nb
 				tmp_max_pc = tmp_pc
 				tmp_max_size = c_size
