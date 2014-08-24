@@ -1196,7 +1196,7 @@ def process_clusters_TM(clusters, f_index, box_dim):					#DONE
 			   
 			#case: interfacial lower
 			if np.size(dist[dist>0]) == np.size(dist):
-				proteins_cluster_status_sizes[cluster, f_index] = -1
+				proteins_cluster_status_sizes[cluster, f_index] = -1				#'cluster' is used as an array containing the index of the proteins for which to store the cluster size
 				proteins_cluster_status_groups[cluster, f_index] = -1
 			#case: interfacial upper
 			elif np.size(dist[dist>0]) == 0:
