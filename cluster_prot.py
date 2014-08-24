@@ -1269,10 +1269,14 @@ def update_color_dict():												#DONE
 		colours_sizes_list.append(colours_sizes_value[c_index])
 	#interfacial proteins on the lower leaflet (prepend -> bottom of colour bar)
 	colours_sizes_dict[-1] = colour_leaflet_lower
-	#colours_sizes_list.insert(0, colour_leaflet_lower)
 	#interfacial proteins on the upper leaflet (append -> top of colour bar)
 	colours_sizes_dict[99999] = colour_leaflet_upper
-	#colours_sizes_list.append(colour_leaflet_upper)
+
+	#attribute lowest size colour and biggest colour to sizes outside the specified size range
+	for c_size in range(1, colours_sizes_range[0]):
+		colours_sizes_dict[c_size] = colours_sizes_dict[colours_sizes_range[0]]
+	for c_size in range(colours_sizes_range[1]+1,proteins_nb):
+		colours_sizes_dict[c_size] = colours_sizes_dict[colours_sizes_range[1]]
 
 	#colours: groups
 	#-------
@@ -1600,26 +1604,31 @@ def write_xvg_sizes_TM():												#DONE
 	output_xvg.write("@ legend box on\n")
 	output_xvg.write("@ legend loctype view\n")
 	output_xvg.write("@ legend 0.98, 0.8\n")
-	tmp_minus = 0
-	output_xvg.write("@ legend length " + str(len(cluster_TM_sizes_sampled)*2) + "\n")
+	output_xvg.write("@ legend length " + str(proteins_nb*2) + "\n")
 	#write caption: %
-	for c_index in range(0,len(cluster_TM_sizes_sampled)):
-		c_size = cluster_TM_sizes_sampled[c_index]
+	for c_index in range(0,proteins_nb):
+		c_size = c_index + 1
 		output_xvg.write("@ s" + str(c_index) + " legend \"% " + str(c_size) + "\"\n")
-		output_txt.write("1_2_clusterprot_1D.xvg," + str(c_index+1) + ",% " + str(c_size) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[c_size])) + "\n")
+		output_txt.write("1_2_clusterprot_1D.xvg," + str(c_index + 1) + ",% " + str(c_size) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[c_size])) + "\n")
 	#write caption: nb
-	for c_index in range(0,len(cluster_TM_sizes_sampled)):
-		c_size = cluster_TM_sizes_sampled[c_index]
-		output_xvg.write("@ s" + str(len(cluster_TM_sizes_sampled) + c_index) + " legend \"nb " + str(c_size) + "\"\n")
-		output_txt.write("1_2_clusterprot_1D.xvg," + str(len(cluster_sizes_sampled) + c_index + 1) + ",nb " + str(c_size) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[c_size])) + "\n")
+	for c_index in range(0,proteins_nb):
+		c_size = c_index + 1
+		output_xvg.write("@ s" + str(proteins_nb + c_index) + " legend \"nb " + str(c_size) + "\"\n")
+		output_txt.write("1_2_clusterprot_1D.xvg," + str(proteins_nb + c_index + 1) + ",nb " + str(c_size) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[c_size])) + "\n")
 	output_txt.close()
 	#write results
 	for f_index in range(0,nb_frames_to_process):
 		results = str(frames_time[f_index])
-		for c_size in cluster_sizes_sampled:
-			results+="	" + str(round(cluster_sizes_pc[c_size][f_index],2))
-		for c_size in cluster_sizes_sampled:
-			results+="	" + str(round(cluster_sizes_nb[c_size][f_index],2))
+		for c_size in range(1, proteins_nb + 1):
+			if c_size in cluster_TM_sizes_sampled:
+				results += "	" + str(round(cluster_sizes_pc[c_size][f_index],2))
+			else: 
+				results += "	0"		
+		for c_size in range(1, proteins_nb + 1):
+			if c_size in cluster_TM_sizes_sampled:
+				results += "	" + str(round(cluster_sizes_nb[c_size][f_index],2))
+			else: 
+				results += "	0"		
 		output_xvg.write(results + "\n")
 	output_xvg.close()
 	
