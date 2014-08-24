@@ -1726,7 +1726,7 @@ def write_xvg_sizes_interfacial():										#DONE
 	output_txt.write("1_2_clusterprot_1D_interfacial.xvg,4, upper (nb)," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[99999])) + "\n")
 	output_txt.close()
 	for f_index in range(0,nb_frames_to_process):
-		results = str(frames_time[f_index]) + "	" + str(round(cluster_sizes_pc[-1][f_index],2)) + "	" + str(round(cluster_sizes_pc[99999][f_index],2)) + "	" + str(round(cluster_sizes_pc[-1][f_index],2)) + "	" + str(round(cluster_sizes_pc[99999][f_index],2))
+		results = str(frames_time[f_index]) + "	" + str(round(cluster_sizes_pc[-1][f_index],2)) + "	" + str(round(cluster_sizes_pc[99999][f_index],2)) + "	" + str(round(cluster_sizes_nb[-1][f_index],2)) + "	" + str(round(cluster_sizes_nb[99999][f_index],2))
 		output_xvg.write(results + "\n")
 	output_xvg.close()
 	
