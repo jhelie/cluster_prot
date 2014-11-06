@@ -91,10 +91,10 @@ The following python modules are needed :
 1. It's a good idea to trjconv the xtc first and only outputs the proteins,  as the 
    script will run MUCH faster. Also, use the -pbc mol option.	
 
-2. If you're interested to find out whether proteins go from a TM orientation to an
-   interfacial orientation, the script can identify bilayer leafletd and track the
-   accummulation of proteins on each leaflet (but clustering information is not calculated
-   for interfacial proteins).
+2. If you want to discriminate between TM and interfacial proteins you need to use the
+   --leaflet option to identify bilayers. The script tracks the accummulation of proteins
+   on each leaflet, but detailed clustering information is only calculated for transmembrane
+   proteins.
 
    To identify leaflets and track interfacial proteins you must specify the --leaflets
    option.
@@ -118,17 +118,21 @@ The following python modules are needed :
     routine.
     This optimisation process can take time in large systems and you can specify your own
     cutoff value to skip this step. For instance to use a 15 Angstrom cutoff value:
-     -> '--leaflet 15'
+     -> '--leaflets 15'
    
     In very large systems (more then ~50,000 phospholipids) LeafletFinder (or rather the
     networkX module that it relies on) can fail. To  avoid this you can choose not to use
     this routine by specifying:
-     -> '--leaflet large'
+     -> '--leaflets large'
     In this case lipids whose headgroups z value is above the average lipids z value will
     be considered to make up the upper leaflet and those whose headgroups z value is below
     the average will be considered to be in the lower leaflet.
     This means that the bilayer should be as flat as possible in the gro file supplied in
     order to get a meaningful outcome.
+
+    Note that if --leaflets is set to the default 'no', bilayer leaflets will not be
+    identified meaning the script will not be able to discriminate between surfacic and
+    interfacial proteins.
 
    (c) flipflopping lipids
     In case lipids flipflop during the trajectory, a file listing them can be supplied
@@ -152,7 +156,7 @@ The following python modules are needed :
     -to specify an open ended group use 'max', e.g. '3,max,colour'
     -groups should be ordered by increasing size and their boundaries should not overlap
     -boundaries are inclusive so you can specify one size groups with 'size,size,colour'
-    -colours must be specified for each group (see (b) in note 8)
+    -colours must be specified for each group (see (c) in note 5)
     -any cluster size not falling within the specified size groups will be labeled as
      'other' and coloured in grey (#E6E6E6)
 	
@@ -954,7 +958,7 @@ def initialise_groups():												#DONE
 
 	#generate colours from colour map if necessary
 	if colours_groups_map != "custom":
-		tmp_cmap = cm.get_cmap(colors_groups_map)
+		tmp_cmap = cm.get_cmap(colours_groups_map)
 		groups_colors_value = tmp_cmap(np.linspace(0, 1, groups_number))
 		for g_index in range(0, groups_number):
 			colours_groups_dict[g_index] = groups_colors_value[g_index]
