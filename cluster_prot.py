@@ -117,7 +117,8 @@ The following python modules are needed :
     the optimum cutoff to identify 2 lipids groups is determined using the optimize_cutoff
     routine.
     This optimisation process can take time in large systems and you can specify your own
-    cutoff value to skip this step. For instance to use a 15 Angstrom cutoff value:
+    cutoff value to skip this step. For instance to use the default 15 Angstrom cutoff
+    directly (without optimising):
      -> '--leaflets 15'
    
     In very large systems (more then ~50,000 phospholipids) LeafletFinder (or rather the
@@ -1060,7 +1061,7 @@ def get_distances(box_dim):												#DONE
 	#method: use distance between cog
 	#--------------------------------
 	else:
-		tmp_proteins_cogs = np.asarray(map(lambda p_index: calculate_cog(proteins_sele[p_index], box_dim), range(0,proteins_nb)))
+		tmp_proteins_cogs = np.asarray(map(lambda p_index: calculate_cog(proteins_sele[p_index].coordinates(), box_dim), range(0,proteins_nb)))
 		dist_matrix = MDAnalysis.analysis.distances.distance_array(np.float32(tmp_proteins_cogs), np.float32(tmp_proteins_cogs), box_dim)
 
 	return dist_matrix
@@ -1068,7 +1069,7 @@ def calculate_cog(tmp_coords, box_dim):									#DONE
 	
 	#this method allows to take pbc into account when calculcating the center of geometry 
 	#see: http://en.wikipedia.org/wiki/Center_of_mass#Systems_with_periodic_boundary_conditions
-	
+		
 	cog_coord = np.zeros(3)
 	tmp_nb_atoms = np.shape(tmp_coords)[0]
 	
