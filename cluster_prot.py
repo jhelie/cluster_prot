@@ -12,7 +12,7 @@ import os.path
 #=========================================================================================
 # create parser
 #=========================================================================================
-version_nb = "0.1.3"
+version_nb = "0.1.4"
 parser = argparse.ArgumentParser(prog='cluster_prot', usage='', add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description=\
 '''
 **********************************************
@@ -91,13 +91,8 @@ The following python modules are needed :
 1. It's a good idea to trjconv the xtc first and only outputs the proteins,  as the 
    script will run MUCH faster. Also, use the -pbc mol option.	
 
-2. If you want to discriminate between TM and interfacial proteins you need to use the
-   --leaflet option to identify bilayers. The script tracks the accummulation of proteins
-   on each leaflet, but detailed clustering information is only calculated for transmembrane
-   proteins.
-
-   To identify leaflets and track interfacial proteins you must specify the --leaflets
-   option.
+2. The script tracks the accummulation of proteins on each leaflet, but detailed clustering
+   information is only calculated for transmembrane proteins.
    
    Identification of the bilayer leaflets can be further controlled via 3 ways:
    (a) beads
@@ -131,9 +126,8 @@ The following python modules are needed :
     This means that the bilayer should be as flat as possible in the gro file supplied in
     order to get a meaningful outcome.
 
-    Note that if --leaflets is set to the default 'no', bilayer leaflets will not be
-    identified meaning the script will not be able to discriminate between surfacic and
-    interfacial proteins.
+    Note that if --leaflets is set to 'no', bilayer leaflets will not be identified meaning
+    the script will not be able to discriminate between surfacic and interfacial proteins.
 
    (c) flipflopping lipids
     In case lipids flipflop during the trajectory, a file listing them can be supplied
@@ -203,7 +197,7 @@ Lipids identification (see note 2)
 -----------------------------------------------------
 --beads			: leaflet identification technique, see note 2(a)
 --flipflops		: input file with flipflopping lipids, see note 2(c)
---leaflets	no	: leaflet identification, see note 2(b)
+--leaflets	optimise	: leaflet identification 'optimise', 'large', 'no' or float, see note 2(b)
 
 Protein clusters identification
 -----------------------------------------------------
@@ -227,7 +221,7 @@ parser.add_argument('-f', nargs=1, dest='grofilename', default=['no'], help=argp
 parser.add_argument('-x', nargs=1, dest='xtcfilename', default=['no'], help=argparse.SUPPRESS)
 parser.add_argument('-o', nargs=1, dest='output_folder', default=['no'], help=argparse.SUPPRESS)
 parser.add_argument('-b', nargs=1, dest='t_start', default=[-1], type=int, help=argparse.SUPPRESS)
-parser.add_argument('-e', nargs=1, dest='t_end', default=[10000000000000], type=int, help=argparse.SUPPRESS)
+parser.add_argument('-e', nargs=1, dest='t_end', default=[-1], type=int, help=argparse.SUPPRESS)
 parser.add_argument('-t', nargs=1, dest='frames_dt', default=[10], type=int, help=argparse.SUPPRESS)
 parser.add_argument('-w', nargs='?', dest='frames_write_dt', const=1000000000000000, default="no", help=argparse.SUPPRESS)
 parser.add_argument('--smooth', nargs=1, dest='nb_smoothing', default=[0], type=int, help=argparse.SUPPRESS)
@@ -315,13 +309,12 @@ else:
 	colours_sizes_range = [int(tmp_col_size[0]), int(tmp_col_size[1])]
 	
 #leaflet identification
-if args.cutoff_leaflet != "no":
-	if args.cutoff_leaflet != "large" and args.cutoff_leaflet != "no" and args.cutoff_leaflet != "optimise":
-		try:
-			args.cutoff_leaflet = float(args.cutoff_leaflet)
-		except:
-			print "Error: the argument of the --leaflets option should be a number or 'large', see note 2"
-			sys.exit(1)
+if args.cutoff_leaflet != "large" and args.cutoff_leaflet != "no" and args.cutoff_leaflet != "optimise":
+	try:
+		args.cutoff_leaflet = float(args.cutoff_leaflet)
+	except:
+		print "Error: the argument of the --leaflets option should set to a number, 'optimise', 'large' or 'no', see note 2"
+		sys.exit(1)
 
 
 #=========================================================================================
@@ -433,13 +426,6 @@ else:
 		print "Error: --nx_cutoff option specified but --algorithm option set to 'density'."
 		sys.exit(1)
 
-if args.cutoff_leaflet != "no" and args.cutoff_leaflet != "optimise":
-	try:
-		args.cutoff_leaflet = float(args.cutoff_leaflet)
-	except:
-		print "Error: the argument of the --leaflets option should be a number or 'large', see note 2"
-		sys.exit(1)
-
 #=========================================================================================
 # create folders and log file
 #=========================================================================================
@@ -466,6 +452,9 @@ else:
 		os.mkdir(args.output_folder + "/1_sizes/1_3_biggest")
 		os.mkdir(args.output_folder + "/1_sizes/1_3_biggest/png")
 		os.mkdir(args.output_folder + "/1_sizes/1_3_biggest/xvg")
+		os.mkdir(args.output_folder + "/1_sizes/1_4_mostrep")
+		os.mkdir(args.output_folder + "/1_sizes/1_4_mostrep/png")
+		os.mkdir(args.output_folder + "/1_sizes/1_4_mostrep/xvg")
 		if args.nb_smoothing>1:
 			os.mkdir(args.output_folder + "/1_sizes/1_4_plots_1D_smoothed")
 			os.mkdir(args.output_folder + "/1_sizes/1_4_plots_1D_smoothed/png")
@@ -553,6 +542,7 @@ def load_MDA_universe():												#DONE
 	global frames_to_write
 	global nb_frames_to_process
 	global f_start
+	global f_end
 	f_start = 0
 	if args.xtcfilename == "no":
 		print "\nLoading file..."
@@ -566,6 +556,7 @@ def load_MDA_universe():												#DONE
 	else:
 		print "\nLoading trajectory..."
 		U = Universe(args.grofilename, args.xtcfilename)
+		U_timestep = U.trajectory.dt
 		all_atoms = U.selectAtoms("all")
 		nb_atoms = all_atoms.numberOfAtoms()
 		nb_frames_xtc = U.trajectory.numframes
@@ -578,23 +569,28 @@ def load_MDA_universe():												#DONE
 			print "Warning: the trajectory contains fewer frames (" + str(nb_frames_xtc) + ") than the frame step specified (" + str(args.frames_dt) + ")."
 
 		#create list of index of frames to process
-		if args.t_start > 0:
-			for ts in U.trajectory:
-				#debug
-				print ts.frame
-				progress = '\r -skipping frame ' + str(ts.frame) + '/' + str(nb_frames_xtc) + '        '
-				sys.stdout.flush()
-				sys.stdout.write(progress)
-				if ts.time/float(1000) < args.t_start:
-					f_start = ts.frame-1
-					break
-		if (nb_frames_xtc - f_start)%args.frames_dt == 0:
+		if args.t_end != -1:
+			f_end = int((args.t_end*1000 - U.trajectory[0].time) / float(U_timestep))
+			if f_end < 0:
+				print "Error: the starting time specified is before the beginning of the xtc."
+				sys.exit(1)
+		else:
+			f_end = nb_frames_xtc - 1
+		if args.t_start != -1:
+			f_start = int((args.t_start*1000 - U.trajectory[0].time) / float(U_timestep))
+			if f_start > f_end:
+				print "Error: the starting time specified is after the end of the xtc."
+				sys.exit(1)
+		if (f_end - f_start)%args.frames_dt == 0:
 			tmp_offset = 0
 		else:
 			tmp_offset = 1
-		frames_to_process = map(lambda f:f_start + args.frames_dt*f, range(0,(nb_frames_xtc - f_start)//args.frames_dt+tmp_offset))
+		frames_to_process = map(lambda f:f_start + args.frames_dt*f, range(0,(f_end - f_start)//args.frames_dt+tmp_offset))
 		nb_frames_to_process = len(frames_to_process)
-			
+		if args.nb_smoothing > nb_frames_to_process:
+			print "Error: the number of frames to process (" + str(nb_frames_to_process) + ") is smaller than the number  of frames to use for smoothing (" + str(args.nb_smoothing) + "). Check the -t and --smooth options."
+			sys.exit(1)
+
 		#create list of frames to write
 		if args.frames_write_dt == "no":
 			frames_to_write = [False for f_index in range(0, nb_frames_to_process)]
@@ -1005,12 +1001,18 @@ def data_struct_stats():												#DONE
 	global cluster_biggest_nb
 	global cluster_biggest_pc
 	global cluster_biggest_size
+	global cluster_mostrep_nb
+	global cluster_mostrep_pc
+	global cluster_mostrep_size
 	
 	cluster_sizes_nb = {}
 	cluster_sizes_pc = {}
 	cluster_biggest_nb = np.zeros(nb_frames_to_process)
 	cluster_biggest_pc = np.zeros(nb_frames_to_process)
 	cluster_biggest_size = np.zeros(nb_frames_to_process)
+	cluster_mostrep_nb = np.zeros(nb_frames_to_process)
+	cluster_mostrep_pc = np.zeros(nb_frames_to_process)
+	cluster_mostrep_size = np.zeros(nb_frames_to_process)
 	if args.cluster_groups_file != "no":
 		global cluster_groups_nb
 		global cluster_groups_pc
@@ -1280,7 +1282,7 @@ def update_color_dict():												#DONE
 	#attribute lowest size colour and biggest colour to sizes outside the specified size range
 	for c_size in range(1, colours_sizes_range[0]):
 		colours_sizes_dict[c_size] = colours_sizes_dict[colours_sizes_range[0]]
-	for c_size in range(colours_sizes_range[1]+1,proteins_nb):
+	for c_size in range(colours_sizes_range[1]+1,proteins_nb+1):
 		colours_sizes_dict[c_size] = colours_sizes_dict[colours_sizes_range[1]]
 
 	#colours: groups
@@ -1310,20 +1312,29 @@ def calculate_statistics():												#DONE
 		tmp_max_nb = 0
 		tmp_max_pc = 0
 		tmp_max_size = 0
+
+		#initialise values for mostrep cluster stat (nb,% and size)
+		tmp_mostrep_nb = 0
+		tmp_mostrep_pc = 0
+		tmp_mostrep_size = 0
 		
 		#store current frame statistics for each size ever sampled
 		for c_size in cluster_sizes_sampled:
 			tmp_nb = tmp_sizes.count(c_size)
 			tmp_pc = tmp_nb / float(proteins_nb) * 100
 			if c_size != -1 and c_size != 99999:					#take into account the cluster size except for interfacial peptides
-				tmp_nb = int(tmp_nb / float(c_size))
-				
+				tmp_nb = int(tmp_nb / float(c_size))				
 			cluster_sizes_nb[c_size][f_index] = tmp_nb
 			cluster_sizes_pc[c_size][f_index] = tmp_pc
 			if tmp_nb > 0 and c_size > tmp_max_size and c_size != -1 and c_size != 99999:
 				tmp_max_nb = tmp_nb
 				tmp_max_pc = tmp_pc
 				tmp_max_size = c_size
+			if tmp_nb > 0 and tmp_pc > tmp_mostrep_pc and c_size != -1 and c_size != 99999:
+				tmp_mostrep_nb = tmp_nb
+				tmp_mostrep_pc = tmp_pc
+				tmp_mostrep_size = c_size
+			
 			if args.cluster_groups_file != "no":
 				g_index = groups_sizes_dict[c_size]
 				cluster_groups_nb[g_index][f_index][g_index] += tmp_nb
@@ -1333,6 +1344,11 @@ def calculate_statistics():												#DONE
 		cluster_biggest_nb[f_index] = tmp_max_nb
 		cluster_biggest_pc[f_index] = tmp_max_pc		
 		cluster_biggest_size[f_index] = tmp_max_size			
+
+		#store most rep cluster stats
+		cluster_mostrep_nb[f_index] = tmp_mostrep_nb
+		cluster_mostrep_pc[f_index] = tmp_mostrep_pc		
+		cluster_mostrep_size[f_index] = tmp_mostrep_size			
 
 	#longest stability of each size group
 	#------------------------------------
@@ -1362,6 +1378,9 @@ def smooth_data():														#DONE
 	global cluster_biggest_nb_smoothed
 	global cluster_biggest_pc_smoothed	
 	global cluster_biggest_size_smoothed
+	global cluster_mostrep_nb_smoothed
+	global cluster_mostrep_pc_smoothed	
+	global cluster_mostrep_size_smoothed
 		
 	#time
 	frames_time_smoothed = rolling_avg(frames_time)
@@ -1371,6 +1390,11 @@ def smooth_data():														#DONE
 	cluster_biggest_pc_smoothed = rolling_avg(cluster_biggest_pc)
 	cluster_biggest_size_smoothed = rolling_avg(cluster_biggest_size)
 	
+	#most rep cluster size
+	cluster_mostrep_nb_smoothed = rolling_avg(cluster_mostrep_nb)
+	cluster_mostrep_pc_smoothed = rolling_avg(cluster_mostrep_pc)
+	cluster_mostrep_size_smoothed = rolling_avg(cluster_mostrep_size)
+		
 	#size
 	for c_size in cluster_sizes_sampled:
 		cluster_sizes_nb_smoothed[c_size] = rolling_avg(cluster_sizes_nb[c_size])
@@ -1413,14 +1437,14 @@ def write_warning():
 	return
 
 #sizes
-def write_xvg_biggest():												#DONE
-	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_3_biggest/xvg/1_2_clusterprot_biggest.txt'
-	filename_xvg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_3_biggest/xvg/1_2_clusterprot_biggest.xvg'
+def write_xvg_biggest():
+	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_3_biggest/xvg/1_3_clusterprot_biggest.txt'
+	filename_xvg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_3_biggest/xvg/1_3_clusterprot_biggest.xvg'
 	output_txt = open(filename_txt, 'w')
-	output_txt.write("@[lipid tail order parameters statistics - written by order_param v" + str(version_nb) + "]\n")
-	output_txt.write("@Use this file as the argument of the -c option of the script 'xvg_animate' in order to make a time lapse movie of the data in 1_2_clusterprot_biggest.xvg.\n")
+	output_txt.write("@[peptides clustering statistics - written by cluster_prot v" + str(version_nb) + "]\n")
+	output_txt.write("@Use this file as the argument of the -c option of the script 'xvg_animate' in order to make a time lapse movie of the data in 1_3_clusterprot_biggest.xvg.\n")
 	output_xvg = open(filename_xvg, 'w')
-	output_xvg.write("@ title \"Number of protein clusters\"\n")
+	output_xvg.write("@ title \"Evolution of statistics of biggest cluster size\"\n")
 	output_xvg.write("@ xaxis  label \"time (ns)\"\n")
 	output_xvg.write("@ autoscale ONREAD xaxes\n")
 	output_xvg.write("@ TYPE XY\n")
@@ -1442,11 +1466,40 @@ def write_xvg_biggest():												#DONE
 		output_xvg.write(results + "\n")
 	output_xvg.close()
 	return
-def graph_xvg_biggest():												#DONE
+def write_xvg_mostrep():
+	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_4_mostrep/xvg/1_4_clusterprot_mostrep.txt'
+	filename_xvg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_4_mostrep/xvg/1_4_clusterprot_mostrep.xvg'
+	output_txt = open(filename_txt, 'w')
+	output_txt.write("@[peptides clustering statistics - written by cluster_prot v" + str(version_nb) + "]\n")
+	output_txt.write("@Use this file as the argument of the -c option of the script 'xvg_animate' in order to make a time lapse movie of the data in 1_4_clusterprot_mostrep.xvg.\n")
+	output_xvg = open(filename_xvg, 'w')
+	output_xvg.write("@ title \"Evolution of statistics of most representative cluster size\"\n")
+	output_xvg.write("@ xaxis  label \"time (ns)\"\n")
+	output_xvg.write("@ autoscale ONREAD xaxes\n")
+	output_xvg.write("@ TYPE XY\n")
+	output_xvg.write("@ view 0.15, 0.15, 0.95, 0.85\n")
+	output_xvg.write("@ legend on\n")
+	output_xvg.write("@ legend box on\n")
+	output_xvg.write("@ legend loctype view\n")
+	output_xvg.write("@ legend 0.98, 0.8\n")
+	output_xvg.write("@ legend length 3\n")
+	output_xvg.write("@ s0 legend \"size\"\n")
+	output_xvg.write("@ s1 legend \"%\"\n")
+	output_xvg.write("@ s2 legend \"nb\"\n")
+	output_txt.write("1_2_clusterprot_mostrep.xvg,1,size,k\n")
+	output_txt.write("1_2_clusterprot_mostrep.xvg,2,%,c\n")
+	output_txt.write("1_2_clusterprot_mostrep.xvg,3,nb,r\n")
+	output_txt.close()
+	for f_index in range(0,nb_frames_to_process):
+		results = str(frames_time[f_index]) + "	" + str(cluster_mostrep_size[f_index]) + "	" + str(round(cluster_mostrep_pc[f_index],2)) + "	" + str(cluster_mostrep_nb[f_index])
+		output_xvg.write(results + "\n")
+	output_xvg.close()
+	return
+def graph_xvg_biggest():
 	#create filenames
 	#----------------
-	filename_png = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_3_biggest/png/1_2_clusterprot_biggest.png'
-	filename_svg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_3_biggest/1_2_clusterprot_biggest.svg'
+	filename_png = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_3_biggest/png/1_3_clusterprot_biggest.png'
+	filename_svg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_3_biggest/1_3_clusterprot_biggest.svg'
 
 	#create figure
 	#-------------
@@ -1499,14 +1552,71 @@ def graph_xvg_biggest():												#DONE
 	fig.savefig(filename_svg)
 	plt.close()
 	return
-def write_xvg_cluster_biggest_smoothed():								#DONE
+def graph_xvg_mostrep():
+	#create filenames
+	#----------------
+	filename_png = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_4_mostrep/png/1_4_clusterprot_mostrep.png'
+	filename_svg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_4_mostrep/1_4_clusterprot_mostrep.svg'
+
+	#create figure
+	#-------------
+	fig=plt.figure(figsize=(8, 6.2))
+	fig.suptitle("Evolution of the size of the most representative protein cluster")
+
+	#plot data: %
+	#------------
+	ax1 = fig.add_subplot(211)
+	p_upper = {}
+	p_upper["size"] = plt.plot(frames_time, cluster_mostrep_size, color = 'k', linewidth = 2.0, label = "size")
+	fontP.set_size("small")
+	ax1.legend(prop=fontP)
+	plt.xlabel('time (ns)', fontsize="small")
+	plt.ylabel('cluster size', fontsize="small")
+
+	#plot data: nb #TO DO: make 2 y axis for the bottom bit, to include nb of clusters
+	#-------------
+	ax2 = fig.add_subplot(212)
+	p_lower = {}
+	p_lower["pc"] = plt.plot(frames_time, cluster_mostrep_pc, color = 'c', linewidth = 2.0, label = "% of proteins")
+	#p_lower["nb"]=plt.plot(time_sorted, cluster_mostrep_nb_sorted, color='r', linewidth=2.0, label="nb of clusters")
+	fontP.set_size("small")
+	ax2.legend(prop=fontP)
+	plt.xlabel('time (ns)', fontsize="small")
+	plt.ylabel('% of proteins', fontsize="small")
+
+	#save figure
+	#-----------
+	ax1.set_ylim(0, max(cluster_mostrep_size)+2)
+	ax2.set_ylim(0, 100)
+	ax1.spines['top'].set_visible(False)
+	ax1.spines['right'].set_visible(False)
+	ax2.spines['top'].set_visible(False)
+	ax2.spines['right'].set_visible(False)
+	ax1.xaxis.set_ticks_position('bottom')
+	ax1.yaxis.set_ticks_position('left')
+	ax2.xaxis.set_ticks_position('bottom')
+	ax2.yaxis.set_ticks_position('left')
+	ax1.xaxis.set_major_locator(MaxNLocator(nbins=5))
+	ax1.yaxis.set_major_locator(MaxNLocator(integer=True, nbins=5))
+	ax2.xaxis.set_major_locator(MaxNLocator(nbins=5))
+	ax2.yaxis.set_major_locator(MaxNLocator(nbins=5))
+	plt.setp(ax1.xaxis.get_majorticklabels(), fontsize="small" )
+	plt.setp(ax1.yaxis.get_majorticklabels(), fontsize="small" )
+	plt.setp(ax2.xaxis.get_majorticklabels(), fontsize="small" )
+	plt.setp(ax2.yaxis.get_majorticklabels(), fontsize="small" )	
+	plt.subplots_adjust(top=0.9, bottom=0.07, hspace=0.37, left=0.09, right=0.96)
+	fig.savefig(filename_png)
+	fig.savefig(filename_svg)
+	plt.close()
+	return
+def write_xvg_cluster_biggest_smoothed():
 	filename_txt=os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_3_biggest/xvg/1_3_clusterprot_cluster_biggest_smooth.txt'
 	filename_xvg=os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_3_biggest/xvg/1_3_clusterprot_cluster_biggest_smooth.xvg'
 	output_txt = open(filename_txt, 'w')
-	output_txt.write("@[lipid tail order parameters statistics - written by order_param v" + str(version_nb) + "]\n")
+	output_txt.write("@[peptides clustering statistics - written by cluster_prot v" + str(version_nb) + "]\n")
 	output_txt.write("@Use this file as the argument of the -c option of the script 'xvg_animate' in order to make a time lapse movie of the data in 1_3_clusterprot_cluster_biggest_smooth.xvg.\n")
 	output_xvg = open(filename_xvg, 'w')
-	output_xvg.write("@ title \"Number of protein clusters\"\n")
+	output_xvg.write("@ title \"Evolution of statistics of biggest cluster size (smoothed)\"\n")
 	output_xvg.write("@ xaxis  label \"time (ns)\"\n")
 	output_xvg.write("@ autoscale ONREAD xaxes\n")
 	output_xvg.write("@ TYPE XY\n")
@@ -1527,7 +1637,35 @@ def write_xvg_cluster_biggest_smoothed():								#DONE
 		output_xvg.write(results + "\n")
 	output_xvg.close()
 	return
-def graph_xvg_cluster_biggest_smoothed():								#DONE
+def write_xvg_cluster_mostrep_smoothed():
+	filename_txt=os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_4_mostrep/xvg/1_4_clusterprot_cluster_mostrep_smooth.txt'
+	filename_xvg=os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_4_mostrep/xvg/1_4_clusterprot_cluster_mostrep_smooth.xvg'
+	output_txt = open(filename_txt, 'w')
+	output_txt.write("@[peptides clustering statistics - written by cluster_prot v" + str(version_nb) + "]\n")
+	output_txt.write("@Use this file as the argument of the -c option of the script 'xvg_animate' in order to make a time lapse movie of the data in 1_4_clusterprot_cluster_mostrep_smooth.xvg.\n")
+	output_xvg = open(filename_xvg, 'w')
+	output_xvg.write("@ title \"Evolution of statistics of most representative cluster size (smoothed)\"\n")
+	output_xvg.write("@ xaxis  label \"time (ns)\"\n")
+	output_xvg.write("@ autoscale ONREAD xaxes\n")
+	output_xvg.write("@ TYPE XY\n")
+	output_xvg.write("@ view 0.15, 0.15, 0.95, 0.85\n")
+	output_xvg.write("@ legend on\n")
+	output_xvg.write("@ legend box on\n")
+	output_xvg.write("@ legend loctype view\n")
+	output_xvg.write("@ legend 0.98, 0.8\n")
+	output_xvg.write("@ legend length 3\n")
+	output_xvg.write("@ s0 legend \"size\"\n")
+	output_xvg.write("@ s1 legend \"%\"\n")
+	output_xvg.write("@ s2 legend \"nb\"\n")
+	output_txt.write("1_3_clusterprot_cluster_mostrep_smooth.xvg,1,size,k\n")
+	output_txt.write("1_3_clusterprot_cluster_mostrep_smooth.xvg,2,%,c\n")
+	output_txt.write("1_3_clusterprot_cluster_mostrep_smooth.xvg,3,nb,r\n")
+	for f_index in range(0, frames_time_smoothed):
+		results = str(frames_time_smoothed[f_index]) + "	" + str(cluster_mostrep_size_smoothed[f_index]) + "	" + str(round(cluster_mostrep_pc_smoothed[f_index],2)) + "	" + str(cluster_mostrep_nb_smoothed[f_index])
+		output_xvg.write(results + "\n")
+	output_xvg.close()
+	return
+def graph_xvg_cluster_biggest_smoothed():
 	#create filenames
 	#----------------
 	filename_png = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_3_biggest/png/1_3_clusterprot_cluster_biggest_smoothed.png'
@@ -1584,7 +1722,64 @@ def graph_xvg_cluster_biggest_smoothed():								#DONE
 	fig.savefig(filename_svg)
 	plt.close()
 	return
-def write_xvg_sizes_TM():												#DONE
+def graph_xvg_cluster_mostrep_smoothed():
+	#create filenames
+	#----------------
+	filename_png = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_4_mostrep/png/1_4_clusterprot_cluster_mostrep_smoothed.png'
+	filename_svg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_4_mostrep/1_4_clusterprot_cluster_mostrep_smoothed.svg'
+
+	#create figure
+	#-------------
+	fig = plt.figure(figsize=(8, 6.2))
+	fig.suptitle("Evolution of the size of the most representative protein cluster")
+		
+	#plot data: %
+	#------------
+	ax1 = fig.add_subplot(211)
+	p_upper = {}
+	p_upper["size"] = plt.plot(frames_time_smoothed, cluster_mostrep_size_smoothed, color = 'k', linewidth = 2.0, label = "size")
+	fontP.set_size("small")
+	ax1.legend(prop=fontP)
+	plt.xlabel('time (ns)', fontsize="small")
+	plt.ylabel('cluster size', fontsize="small")
+
+	#plot data: nb #TO DO: make 2 y axis for the bottom bit, to include nb of clusters
+	#-------------
+	ax2 = fig.add_subplot(212)
+	p_lower = {}
+	p_lower["pc"] = plt.plot(frames_time_smoothed, cluster_mostrep_pc_smoothed, color = 'c', linewidth = 2.0, label = "% of proteins")
+	#p_lower["nb"] = plt.plot(time_smoothed, cluster_mostrep_nb_smoothed, color='r', linewidth=2.0, label="nb of clusters")
+	fontP.set_size("small")
+	ax2.legend(prop=fontP)
+	plt.xlabel('time (ns)', fontsize="small")
+	plt.ylabel('% of proteins', fontsize="small")
+
+	#save figure
+	#-----------
+	ax1.set_ylim(0, np.floor(max(cluster_mostrep_size)+2))
+	ax2.set_ylim(0, 100)
+	ax1.spines['top'].set_visible(False)
+	ax1.spines['right'].set_visible(False)
+	ax2.spines['top'].set_visible(False)
+	ax2.spines['right'].set_visible(False)
+	ax1.xaxis.set_ticks_position('bottom')
+	ax1.yaxis.set_ticks_position('left')
+	ax2.xaxis.set_ticks_position('bottom')
+	ax2.yaxis.set_ticks_position('left')
+	ax1.xaxis.set_major_locator(MaxNLocator(nbins=5))
+	ax1.yaxis.set_major_locator(MaxNLocator(integer=True, nbins=5))
+	ax2.xaxis.set_major_locator(MaxNLocator(nbins=5))
+	ax2.yaxis.set_major_locator(MaxNLocator(nbins=5))
+	plt.setp(ax1.xaxis.get_majorticklabels(), fontsize="small" )
+	plt.setp(ax1.yaxis.get_majorticklabels(), fontsize="small" )
+	plt.setp(ax2.xaxis.get_majorticklabels(), fontsize="small" )
+	plt.setp(ax2.yaxis.get_majorticklabels(), fontsize="small" )	
+	plt.subplots_adjust(top=0.9, bottom=0.07, hspace=0.37, left=0.09, right=0.96)
+	fig.savefig(filename_png)
+	fig.savefig(filename_svg)
+	plt.close()
+	return
+def write_xvg_sizes_TM():
 
 	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/xvg/1_2_clusterprot_1D_TM.txt'
 	filename_xvg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/xvg/1_2_clusterprot_1D_TM.xvg'
@@ -1638,7 +1833,7 @@ def write_xvg_sizes_TM():												#DONE
 	output_xvg.close()
 	
 	return
-def graph_xvg_sizes_TM():												#DONE
+def graph_xvg_sizes_TM():
 	
 	#create filenames
 	#----------------
@@ -1704,7 +1899,7 @@ def graph_xvg_sizes_TM():												#DONE
 	plt.close()
 
 	return
-def write_xvg_sizes_interfacial():										#DONE
+def write_xvg_sizes_interfacial():
 
 	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/xvg/1_2_clusterprot_1D_interfacial.txt'
 	filename_xvg = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_2_plots_1D/xvg/1_2_clusterprot_1D_interfacial.xvg'
@@ -1745,7 +1940,7 @@ def write_xvg_sizes_interfacial():										#DONE
 	output_xvg.close()
 	
 	return
-def graph_xvg_sizes_interfacial():										#DONE
+def graph_xvg_sizes_interfacial():
 	
 	#create filenames
 	#----------------
@@ -1809,11 +2004,10 @@ def graph_xvg_sizes_interfacial():										#DONE
 	plt.close()
 
 	return
-
-def write_xvg_sizes_smoothed():											#DONE
+def write_xvg_sizes_smoothed():
 	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_4_plots_1D_smoothed/xvg/1_4_clusterprot_1D_smoothed.txt'
 	output_txt = open(filename_txt, 'w')
-	output_txt.write("@[lipid tail order parameters statistics - written by order_param v" + str(version_nb) + "]\n")
+	output_txt.write("@[peptides clustering statistics - written by cluster_prot v" + str(version_nb) + "]\n")
 	output_txt.write("@Use this file as the argument of the -c option of the script 'xvg_animate' in order to make a time lapse movie of the data in 1_4_clusterprot_1D_smoothed.xvg.\n")
 	filename_xvg=os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_4_plots_1D_smoothed/xvg/1_4_clusterprot_1D_smoothed.xvg'
 	output_xvg = open(filename_xvg, 'w')
@@ -1849,7 +2043,7 @@ def write_xvg_sizes_smoothed():											#DONE
 	output_xvg.close()
 
 	return
-def graph_xvg_sizes_smoothed():											#DONE
+def graph_xvg_sizes_smoothed():
 	
 	#create filenames
 	#----------------
@@ -1903,7 +2097,7 @@ def graph_xvg_sizes_smoothed():											#DONE
 	plt.close()
 
 	return
-def graph_aggregation_2D_sizes():										#DONE
+def graph_aggregation_2D_sizes():
 
 	#create filenames
 	filename_png = os.getcwd() + '/' + str(args.output_folder) + '/1_sizes/1_1_plots_2D/png/1_1_clusterprot_2D.png'
@@ -1994,7 +2188,7 @@ def write_xvg_groups():
 	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_2_plots_1D/xvg/2_2_clusterprot_1D.txt'
 	filename_xvg = os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_2_plots_1D/xvg/2_2_clusterprot_1D.xvg'
 	output_txt = open(filename_txt, 'w')
-	output_txt.write("@[lipid tail order parameters statistics - written by order_param v" + str(version_nb) + "]\n")
+	output_txt.write("@[peptides clustering statistics - written by cluster_prot v" + str(version_nb) + "]\n")
 	output_txt.write("@Use this file as the argument of the -c option of the script 'xvg_animate' in order to make a time lapse movie of the data in 2_2_clusterprot_1D.xvg.\n")
 	output_xvg = open(filename_xvg, 'w')
 	output_xvg.write("@ title \"Number of protein clusters\"\n")
@@ -2094,7 +2288,7 @@ def graph_xvg_groups():
 def write_xvg_groups_smoothed():											
 	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_4_plots_1D_smoothed/xvg/2_4_clusterprot_1D_smoothed.txt'
 	output_txt = open(filename_txt, 'w')
-	output_txt.write("@[lipid tail order parameters statistics - written by order_param v" + str(version_nb) + "]\n")
+	output_txt.write("@[peptides clustering statistics - written by cluster_prot v" + str(version_nb) + "]\n")
 	output_txt.write("@Use this file as the argument of the -c option of the script 'xvg_animate' in order to make a time lapse movie of the data in 2_4_clusterprot_1D_smoothed.xvg.\n")
 	filename_xvg=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_4_plots_1D_smoothed/xvg/2_4_clusterprot_1D_smoothed.xvg'
 	output_xvg = open(filename_xvg, 'w')
@@ -2698,7 +2892,7 @@ else:
 		ts = U.trajectory[frames_to_process[f_index]]
 		if ts.time/float(1000) > args.t_end:
 			break
-		progress = '\r -processing frame ' + str(ts.frame) + '/' + str(nb_frames_xtc) + '                      '  
+		progress = '\r -processing frame ' + str(f_index+1) + '/' + str(nb_frames_to_process) + ' (every ' + str(args.frames_dt) + ' frame(s) from frame ' + str(f_start) + ' to frame ' + str(f_end) + ' out of ' + str(nb_frames_xtc) + ')      '  
 		sys.stdout.flush()
 		sys.stdout.write(progress)
 
@@ -2789,6 +2983,9 @@ else:
 		graph_aggregation_2D_sizes()
 		write_xvg_biggest()
 		graph_xvg_biggest()
+		write_xvg_mostrep()
+		graph_xvg_mostrep()
+
 		write_xvg_sizes_TM()
 		graph_xvg_sizes_TM()
 		write_xvg_sizes_interfacial()
@@ -2798,6 +2995,8 @@ else:
 			graph_xvg_sizes_smoothed()
 			write_xvg_cluster_biggest_smoothed()
 			graph_xvg_cluster_biggest_smoothed()
+			write_xvg_cluster_mostrep_smoothed()
+			graph_xvg_cluster_mostrep_smoothed()
 		if args.cluster_groups_file != "no":
 			graph_aggregation_2D_groups()
 			write_stability_groups()
