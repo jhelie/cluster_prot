@@ -1337,8 +1337,8 @@ def calculate_statistics():												#DONE
 			
 			if args.cluster_groups_file != "no":
 				g_index = groups_sizes_dict[c_size]
-				cluster_groups_nb[g_index][f_index][g_index] += tmp_nb
-				cluster_groups_pc[g_index][f_index][g_index] += tmp_pc
+				cluster_groups_nb[g_index][f_index] += tmp_nb
+				cluster_groups_pc[g_index][f_index] += tmp_pc
 		
 		#store biggest cluster stats
 		cluster_biggest_nb[f_index] = tmp_max_nb
@@ -1353,11 +1353,11 @@ def calculate_statistics():												#DONE
 	#longest stability of each size group
 	#------------------------------------
 	if args.xtcfilename != "no" and args.cluster_groups_file != "no":
-		for g_index in cluster_TM_groups_sampled:
+		for g_index in cluster_groups_sampled:
 			#find max stability of current group index for each protein
 			tmp_proteins_stability = {}
 			for p_index in range(0,proteins_nb):
-				if g_index in proteins_cluster_group_mat[p_index,:]:
+				if g_index in proteins_cluster_status_groups[p_index,:]:
 					tmp_proteins_stability[p_index] = max(len(list(v)) for g,v in itertools.groupby(proteins_cluster_status_groups[p_index,:], lambda x: x == g_index) if g)
 				else:
 					tmp_proteins_stability[p_index] = 0
@@ -2482,7 +2482,7 @@ def write_stability_groups():											#TO CHECK
 	#group info
 	tmp_cap1 = ""
 	tmp_cap2 = "-----"
-	for g_index in cluster_TM_groups_sampled:
+	for g_index in cluster_groups_sampled:
 		if g_index == groups_number:
 			tmp_cap1 += "	other"
 		elif groups_boundaries[g_index][1]==100000:
