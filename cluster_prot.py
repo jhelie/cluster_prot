@@ -387,7 +387,7 @@ if args.cluster_groups_file != "no" and not os.path.isfile(args.cluster_groups_f
 if args.beadsfilename != "no" and not os.path.isfile(args.beadsfilename):
 	print "Error: file " + str(args.beadsfilename) + " not found."
 	sys.exit(1)
-if args.t_end < args.t_start:
+if args.t_end != -1 and args.t_end < args.t_start:
 	print "Error: the starting time (" + str(args.t_start) + "ns) for analysis is later than the ending time (" + str(args.t_end) + "ns)."
 	sys.exit(1)
 if args.buffer_size < -1:
@@ -562,7 +562,7 @@ def load_MDA_universe():												#DONE
 		nb_frames_xtc = U.trajectory.numframes
 		U.trajectory.rewind()
 		#sanity check
-		if U.trajectory.time/float(1000) < args.t_start:
+		if U.trajectory[nb_frames_xtc-1].time/float(1000) < args.t_start:
 			print "Error: the trajectory duration (" + str(U.trajectory.time/float(1000)) + "ns) is shorted than the starting stime specified (" + str(args.t_start) + "ns)."
 			sys.exit(1)
 		if U.trajectory.numframes < args.frames_dt:
@@ -595,7 +595,7 @@ def load_MDA_universe():												#DONE
 		if args.frames_write_dt == "no":
 			frames_to_write = [False for f_index in range(0, nb_frames_to_process)]
 		else:
-			frames_to_write = [True if (f_index % args.frames_write_dt == 0 or f_index == (nb_frames_xtc - f_start)//args.frames_dt) else False for f_index in range(0, nb_frames_to_process)]
+			frames_to_write = [True if (f_index % args.frames_write_dt == 0 or f_index == (f_end - f_start)//args.frames_dt) else False for f_index in range(0, nb_frames_to_process)]
 
 	#check for the presence of proteins
 	test_prot = U.selectAtoms("protein")
@@ -2890,8 +2890,6 @@ if args.xtcfilename == "no":
 else:
 	for f_index in range(0,nb_frames_to_process):
 		ts = U.trajectory[frames_to_process[f_index]]
-		if ts.time/float(1000) > args.t_end:
-			break
 		progress = '\r -processing frame ' + str(f_index+1) + '/' + str(nb_frames_to_process) + ' (every ' + str(args.frames_dt) + ' frame(s) from frame ' + str(f_start) + ' to frame ' + str(f_end) + ' out of ' + str(nb_frames_xtc) + ')      '  
 		sys.stdout.flush()
 		sys.stdout.write(progress)
