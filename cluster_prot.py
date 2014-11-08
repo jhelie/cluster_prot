@@ -946,7 +946,7 @@ def initialise_groups():												#DONE
 	if max(groups_sizes_dict.keys())!= 100000:															    #this handles potentially unaccounted for sizes above the maximum specified by the user (in case it's not an open group)
 		for tmp_size in range(max(groups_sizes_dict.keys())+1,100001):
 			groups_sizes_dict[tmp_size] = groups_number
-
+	
 	#check whether a colour map was specified
 	if groups_number > 1 and len(np.unique(colours_groups_dict.values())) == 1:
 		if np.unique(colours_groups_dict.values())[0] in colormaps_possible:
@@ -1247,15 +1247,21 @@ def get_sizes_sampled():												#DONE
 	global cluster_TM_sizes_sampled
 	global cluster_sizes_nb
 	global cluster_sizes_pc
-	cluster_sizes_sampled = sorted(np.unique(proteins_cluster_status_sizes))
-	cluster_TM_sizes_sampled = [c_size for c_size in cluster_sizes_sampled if (c_size != -1 and c_size != 99999)]
+	cluster_sizes_sampled = np.unique(proteins_cluster_status_sizes)
+	cluster_TM_sizes_sampled = cluster_sizes_sampled[cluster_sizes_sampled != -1]
+	cluster_TM_sizes_sampled = cluster_TM_sizes_sampled[cluster_TM_sizes_sampled != 99999]
+	cluster_sizes_sampled = sorted(cluster_sizes_sampled)
+	cluster_TM_sizes_sampled = sorted(cluster_TM_sizes_sampled)
 	cluster_sizes_nb = {c_size: np.zeros(nb_frames_to_process) for c_size in cluster_sizes_sampled + [-1,99999]}
 	cluster_sizes_pc = {c_size: np.zeros(nb_frames_to_process) for c_size in cluster_sizes_sampled + [-1,99999]}
 
 	if args.cluster_groups_file!="no":
-		global cluster_groups_sampled
-		cluster_groups_sampled = sorted(np.unique(proteins_cluster_status_groups))
-		
+		global cluster_TM_groups_sampled
+		cluster_TM_groups_sampled = np.unique(proteins_cluster_status_groups)
+		cluster_TM_groups_sampled = cluster_TM_groups_sampled[cluster_TM_groups_sampled != -1]
+		cluster_TM_groups_sampled = cluster_TM_groups_sampled[cluster_TM_groups_sampled != 99999]
+		cluster_TM_groups_sampled = sorted(cluster_TM_groups_sampled)
+
 	return
 def update_color_dict():												#DONE
 	
@@ -1322,8 +1328,7 @@ def calculate_statistics():												#DONE
 				tmp_mostrep_nb = tmp_nb
 				tmp_mostrep_pc = tmp_pc
 				tmp_mostrep_size = c_size
-			
-			if args.cluster_groups_file != "no":
+			if args.cluster_groups_file != "no" and c_size != -1 and c_size != 99999:
 				g_index = groups_sizes_dict[c_size]
 				cluster_groups_nb[g_index][f_index] += tmp_nb
 				cluster_groups_pc[g_index][f_index] += tmp_pc
@@ -1341,7 +1346,7 @@ def calculate_statistics():												#DONE
 	#longest stability of each size group
 	#------------------------------------
 	if args.xtcfilename != "no" and args.cluster_groups_file != "no":
-		for g_index in cluster_groups_sampled:
+		for g_index in cluster_TM_groups_sampled:
 			#find max stability of current group index for each protein
 			tmp_proteins_stability = {}
 			for p_index in range(0,proteins_nb):
@@ -1363,6 +1368,8 @@ def rolling_avg(loc_list):												#DONE
 def smooth_data():														#DONE
 
 	global frames_time_smoothed
+	global cluster_sizes_nb_smoothed
+	global cluster_sizes_pc_smoothed
 	global cluster_biggest_nb_smoothed
 	global cluster_biggest_pc_smoothed	
 	global cluster_biggest_size_smoothed
@@ -1370,6 +1377,9 @@ def smooth_data():														#DONE
 	global cluster_mostrep_pc_smoothed	
 	global cluster_mostrep_size_smoothed
 		
+	cluster_sizes_nb_smoothed = {}
+	cluster_sizes_pc_smoothed = {}
+
 	#time
 	frames_time_smoothed = rolling_avg(frames_time)
 	
@@ -1390,7 +1400,7 @@ def smooth_data():														#DONE
 	
 	#groups
 	if args.cluster_groups_file!="no":
-		for g_index in cluster_groups_sampled:
+		for g_index in cluster_TM_groups_sampled:
 			cluster_groups_nb_smoothed[g_index] = rolling_avg(cluster_groups_nb[g_index])
 			cluster_groups_pc_smoothed[g_index] = rolling_avg(cluster_groups_pc[g_index])
 		
@@ -2196,24 +2206,24 @@ def write_xvg_groups():
 	output_xvg.write("@ legend box on\n")
 	output_xvg.write("@ legend loctype view\n")
 	output_xvg.write("@ legend 0.98, 0.8\n")
-	output_xvg.write("@ legend length " + str(len(cluster_groups_sampled)*2) + "\n")
+	output_xvg.write("@ legend length " + str(len(cluster_TM_groups_sampled)*2) + "\n")
 	#write caption: %
-	for c_index in range(0,len(cluster_groups_sampled)):
-		g_index = cluster_groups_sampled[c_index]
+	for c_index in range(0,len(cluster_TM_groups_sampled)):
+		g_index = cluster_TM_groups_sampled[c_index]
 		output_xvg.write("@ s" + str(c_index) + " legend \"% " + str(groups_labels[g_index]) + "\"\n")
 		output_txt.write("1_2_clusterprot_1D.xvg," + str(c_index+1) + ",% " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_groups_dict[g_index])) + "\n")
 	#write caption: nb
-	for c_index in range(0,len(cluster_groups_sampled)):
-		g_index = cluster_groups_sampled[c_index]
-		output_xvg.write("@ s" + str(len(cluster_groups_sampled) + c_index) + " legend \"nb " + str(groups_labels[g_index]) + "\"\n")
-		output_txt.write("1_2_clusterprot_1D.xvg," + str(len(cluster_groups_sampled) + c_index + 1) + ",nb " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex((colours_groups_dict[g_index])) + "\n")
+	for c_index in range(0,len(cluster_TM_groups_sampled)):
+		g_index = cluster_TM_groups_sampled[c_index]
+		output_xvg.write("@ s" + str(len(cluster_TM_groups_sampled) + c_index) + " legend \"nb " + str(groups_labels[g_index]) + "\"\n")
+		output_txt.write("1_2_clusterprot_1D.xvg," + str(len(cluster_TM_groups_sampled) + c_index + 1) + ",nb " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex((colours_groups_dict[g_index])) + "\n")
 	output_txt.close()
 	#write results
 	for f_index in range(0,nb_frames_to_process):
 		results = str(frames_time[f_index])
-		for g_index in cluster_groups_sampled:
+		for g_index in cluster_TM_groups_sampled:
 			results+="	" + str(round(cluster_groups_pc[g_index][f_index],2))
-		for g_index in cluster_groups_sampled:
+		for g_index in cluster_TM_groups_sampled:
 			results+="	" + str(round(cluster_groups_nb[g_index][f_index],2))
 		output_xvg.write(results + "\n")
 	output_xvg.close()
@@ -2235,7 +2245,7 @@ def graph_xvg_groups():
 	#------------
 	ax1 = fig.add_subplot(211)
 	p_upper = {}
-	for g_index in cluster_groups_sampled:
+	for g_index in cluster_TM_groups_sampled:
 		p_upper[g_index] = plt.plot(frames_time, cluster_groups_pc[g_index], color = colours_groups_dict[g_index], linewidth = 2.0, label = str(groups_labels[g_index]))
 	fontP.set_size("small")
 	ax1.legend(prop=fontP)
@@ -2247,7 +2257,7 @@ def graph_xvg_groups():
 	#-------------
 	ax2 = fig.add_subplot(212)
 	p_lower = {}
-	for g_index in cluster_groups_sampled:
+	for g_index in cluster_TM_groups_sampled:
 		p_lower[g_index] = plt.plot(frames_time, cluster_groups_nb[g_index], color = colours_groups_dict[g_index], linewidth = 2.0, label=str(groups_labels[g_index]))
 	fontP.set_size("small")
 	ax2.legend(prop=fontP)
@@ -2304,24 +2314,24 @@ def write_xvg_groups_smoothed():
 	output_xvg.write("@ legend box on\n")
 	output_xvg.write("@ legend loctype view\n")
 	output_xvg.write("@ legend 0.98, 0.8\n")
-	output_xvg.write("@ legend length " + str(len(cluster_groups_sampled)*2) + "\n")
+	output_xvg.write("@ legend length " + str(len(cluster_TM_groups_sampled)*2) + "\n")
 	#write caption: %
-	for c_index in range(0,len(cluster_groups_sampled)):
-		g_index = cluster_groups_sampled[c_index]
+	for c_index in range(0,len(cluster_TM_groups_sampled)):
+		g_index = cluster_TM_groups_sampled[c_index]
 		output_xvg.write("@ s" + str(c_index) + " legend \"% " + str(groups_labels[g_index]) + "\"\n")
 		output_txt.write("2_4_clusterprot_1D_smoothed.xvg," + str(c_index+1) + ",% " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex((colours_groups_dict[g_index])) + "\n")
 	#write caption: nb
-	for c_index in range(0,len(cluster_groups_sampled)):
-		g_index = cluster_groups_sampled[c_index]
-		output_xvg.write("@ s" + str(len(cluster_groups_sampled) + c_index) + " legend \"nb " + str(groups_labels[g_index]) + "\"\n")
-		output_txt.write("2_4_clusterprot_1D_smoothed.xvg," + str(len(cluster_groups_sampled) + c_index + 1) + ",nb " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_groups_dict[g_index])) + "\n")
+	for c_index in range(0,len(cluster_TM_groups_sampled)):
+		g_index = cluster_TM_groups_sampled[c_index]
+		output_xvg.write("@ s" + str(len(cluster_TM_groups_sampled) + c_index) + " legend \"nb " + str(groups_labels[g_index]) + "\"\n")
+		output_txt.write("2_4_clusterprot_1D_smoothed.xvg," + str(len(cluster_TM_groups_sampled) + c_index + 1) + ",nb " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_groups_dict[g_index])) + "\n")
 	output_txt.close()
 	#write results
 	for f_index in range(0, len(time_smoothed)):
 		results = str(frames_time_smoothed[f_index])
-		for g_index in cluster_groups_sampled:
+		for g_index in cluster_TM_groups_sampled:
 			results += "	" + str(round(cluster_groups_pc_smoothed[g_index][f_index],2))
-		for g_index in cluster_groups_sampled:
+		for g_index in cluster_TM_groups_sampled:
 			results += "	" + str(round(cluster_groups_nb_smoothed[g_index][f_index],2))
 		output_xvg.write(results + "\n")
 	output_xvg.close()
@@ -2343,7 +2353,7 @@ def graph_xvg_groups_smoothed():
 	#------------
 	ax1 = fig.add_subplot(211)
 	p_upper = {}
-	for g_index in cluster_groups_sampled:
+	for g_index in cluster_TM_groups_sampled:
 		p_upper[g_index]=plt.plot(frames_time_smoothed, cluster_groups_pc_smoothed[g_index], color = colours_groups_dict[g_index], linewidth = 2.0, label = str(groups_labels[g_index]))
 	fontP.set_size("small")
 	ax1.legend(prop=fontP)
@@ -2355,7 +2365,7 @@ def graph_xvg_groups_smoothed():
 	#-------------
 	ax2 = fig.add_subplot(212)
 	p_lower = {}
-	for g_index in cluster_groups_sampled:
+	for g_index in cluster_TM_groups_sampled:
 		p_lower[g_index] = plt.plot(frames_time_smoothed, cluster_groups_nb_smoothed[g_index], color = colours_groups_dict[g_index], linewidth = 2.0, label = str(groups_labels[g_index]))
 	fontP.set_size("small")
 	ax2.legend(prop=fontP)
@@ -2388,7 +2398,7 @@ def graph_aggregation_2D_groups():										#TO CHECK
 	filename_svg=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_1_plots_2D//2_1_clusterprot_2D.svg'
 
 	#build color map
-	if groups_number in cluster_groups_sampled:						#proteins in cluster of a different size		
+	if groups_number in cluster_TM_groups_sampled:						#proteins in cluster of a different size		
 		colours_groups_dict[groups_number] = colour_group_other
 		colours_groups_list.append(colour_group_other)
 	color_map = mcolors.LinearSegmentedColormap.from_list('custom', colours_groups_list, len(colours_groups_list))
@@ -2499,7 +2509,7 @@ def write_stability_groups():											#TO CHECK
 	#group info
 	tmp_cap1 = "sizes	"
 	tmp_cap2 = "-----"
-	for g_index in cluster_groups_sampled:
+	for g_index in cluster_TM_groups_sampled:
 		if g_index == groups_number:
 			tmp_cap1 += "	other"
 		elif groups_boundaries[g_index][1]==100000:
@@ -2513,7 +2523,7 @@ def write_stability_groups():											#TO CHECK
 	output_stat.write(tmp_cap1 + "\n")
 	output_stat.write(tmp_cap2 + "\n")
 	results = str("nb frames")
-	for g_index in cluster_groups_sampled:
+	for g_index in cluster_TM_groups_sampled:
 		results += "	" + str(proteins_groups_stability[g_index])
 	output_stat.write(results + "\n")
 
@@ -2604,7 +2614,7 @@ def write_frame_stat(f_nb, f_index, f_t):								#DONE
 			output_stat.write("\n")
 			output_stat.write("Groups sampled: ")
 			tmp_res = ""
-			for g_index in cluster_groups_sampled:
+			for g_index in cluster_TM_groups_sampled:
 				tmp_res += "," + str(g_index)
 			output_stat.write(tmp_res[1:] + "\n")		
 			output_stat.write("\n")
@@ -2698,12 +2708,12 @@ def write_frame_stat(f_nb, f_index, f_t):								#DONE
 			tmp_cap1 = "cluster_group"
 			tmp_cap2 = "-----------"
 			tmp_res = "% proteins"
-			for g_index in cluster_groups_sampled:
+			for g_index in cluster_TM_groups_sampled:
 				tmp_cap1 += "	" + str(g_index)
 				tmp_cap2 += "--------"
 			output_stat.write(tmp_cap1 + "\n")
 			output_stat.write(tmp_cap2 + "\n")
-			for g_index in cluster_groups_sampled:		
+			for g_index in cluster_TM_groups_sampled:		
 				tmp_res += "	" + str(round(cluster_groups_pc[g_index][f_index],1))
 			output_stat.write(tmp_res + "\n")		
 			output_stat.close()
@@ -2843,7 +2853,7 @@ def write_xtc_annotation(action):										#DONE
 					tmp_prot_sele += "." + proteins_sele_string_VMD[p_index]
 				f.write(tmp_prot_sele[1:] + "\n")
 				#ouput min and max size
-				f.write(str(min(cluster_groups_sampled)) + "." + str(max(cluster_groups_sampled)) + "\n")
+				f.write(str(min(cluster_TM_groups_sampled)) + "." + str(max(cluster_TM_groups_sampled)) + "\n")
 				#write data
 				f.write(tmp_data)
 
