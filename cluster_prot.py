@@ -381,9 +381,6 @@ if args.cluster_groups_file != "no" and not os.path.isfile(args.cluster_groups_f
 if args.selection_file_ff != "no" and not os.path.isfile(args.selection_file_ff):
 	print "Error: file " + str(args.selection_file_ff) + " not found."
 	sys.exit(1)
-if args.cluster_groups_file != "no" and not os.path.isfile(args.cluster_groups_file):
-	print "Error: file " + str(args.cluster_groups_file) + " not found."
-	sys.exit(1)
 if args.beadsfilename != "no" and not os.path.isfile(args.beadsfilename):
 	print "Error: file " + str(args.beadsfilename) + " not found."
 	sys.exit(1)
@@ -974,8 +971,8 @@ def initialise_groups():												#DONE
 
 	#add colours for the group "other", "lower" and "upper"
 	groups_labels[groups_number] = "other"
-	groups_labels[groups_number+1] = "lower"
-	groups_labels[groups_number+2] = "upper"
+	groups_labels[-1] = "lower"
+	groups_labels[groups_number+1] = "upper"
 		
 	return
 
@@ -1259,7 +1256,7 @@ def get_sizes_sampled():												#DONE
 		global cluster_TM_groups_sampled
 		cluster_TM_groups_sampled = np.unique(proteins_cluster_status_groups)
 		cluster_TM_groups_sampled = cluster_TM_groups_sampled[cluster_TM_groups_sampled != -1]
-		cluster_TM_groups_sampled = cluster_TM_groups_sampled[cluster_TM_groups_sampled != 99999]
+		cluster_TM_groups_sampled = cluster_TM_groups_sampled[cluster_TM_groups_sampled != groups_number + 1]
 		cluster_TM_groups_sampled = sorted(cluster_TM_groups_sampled)		
 		if groups_number in cluster_TM_groups_sampled:
 			colours_groups_dict[groups_number] = colour_group_other
@@ -2087,7 +2084,7 @@ def graph_xvg_sizes_smoothed():
 	#save figure
 	#-----------
 	ax1.set_ylim(0, 100)
-	ax2.set_ylim(0, max(max(cluster_sizes_nb_smoothed.values()))+1)
+	ax2.set_ylim(0, np.max(cluster_sizes_nb_smoothed.values())+1)
 	ax1.xaxis.set_major_locator(MaxNLocator(nbins=7))
 	ax1.yaxis.set_major_locator(MaxNLocator(nbins=5))
 	ax2.xaxis.set_major_locator(MaxNLocator(nbins=7))
@@ -2215,13 +2212,18 @@ def write_xvg_groups():
 	output_xvg.write("@ legend 0.98, 0.8\n")
 	output_xvg.write("@ legend length " + str(len(cluster_TM_groups_sampled)*2) + "\n")
 		
+	#debug
+	print groups_labels
+	print colours_groups_dict
+	print cluster_TM_groups_sampled
+	
 	#write caption: %
 	for c_index in range(0,len(cluster_TM_groups_sampled)):
 		g_index = cluster_TM_groups_sampled[c_index]		
 		output_xvg.write("@ s" + str(c_index) + " legend \"% " + str(groups_labels[g_index]) + "\"\n")
 		output_txt.write("1_2_clusterprot_1D.xvg," + str(c_index+1) + ",% " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_groups_dict[g_index])) + "\n")
 	#write caption: nb
-	for c_index in range(0,len(cluster_TM_groups_sampled)):
+	for c_index in range(0,len(cluster_TM_groups_sampled)):		
 		g_index = cluster_TM_groups_sampled[c_index]
 		output_xvg.write("@ s" + str(len(cluster_TM_groups_sampled) + c_index) + " legend \"nb " + str(groups_labels[g_index]) + "\"\n")
 		output_txt.write("1_2_clusterprot_1D.xvg," + str(len(cluster_TM_groups_sampled) + c_index + 1) + ",nb " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_groups_dict[g_index])) + "\n")
@@ -2612,7 +2614,7 @@ def write_frame_stat(f_nb, f_index, f_t):								#DONE
 			#group index definition
 			output_stat.write("\n")
 			output_stat.write("Group size ranges:\n")
-			for g_index in range(0,groups_number+3):
+			for g_index in range(0,groups_number+2):
 				output_stat.write(str(g_index) + "=" + str(groups_labels[g_index]) + "\n")
 
 			#data results
@@ -2703,7 +2705,7 @@ def write_frame_stat(f_nb, f_index, f_t):								#DONE
 			#group index definition
 			output_stat.write("\n")
 			output_stat.write("Group size ranges:\n")
-			for g_index in range(0,groups_number+3):
+			for g_index in range(0,groups_number+2):
 				output_stat.write(str(g_index) + "=" + str(groups_labels[g_index]) + "+\n")
 
 			#what's in this file
