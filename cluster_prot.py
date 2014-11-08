@@ -2430,7 +2430,9 @@ def graph_aggregation_2D_groups():										#TO CHECK
 	#create figure ('norm' requires at least 2 elements to work)
 	fig = plt.figure(figsize=(9, 8))
 	ax_plot = fig.add_axes([0.10, 0.1, 0.75, 0.77])	
-	ax_plot.matshow(proteins_cluster_status_groups, origin = 'lower', interpolation = 'nearest', cmap = color_map, aspect = 'auto', norm = norm)
+	#ax_plot.matshow(proteins_cluster_status_groups, origin = 'lower', interpolation = 'nearest', cmap = color_map, aspect = 'auto', norm = norm)
+	ax_plot.matshow(proteins_cluster_status_groups, origin = 'lower')
+	
 
 	#create color bar
 	ax_cbar=fig.add_axes([0.88, 0.1, 0.025, 0.77])
@@ -2509,9 +2511,8 @@ def write_stability_groups():											#TO CHECK
 	output_stat.write("Note: frames skipped are not taken into account (the nb below correspond to consecutive frames processed)\n")
 	
 	#group info
-	tmp_cap1 = "sizes"
-	#tmp_cap2 = "-----"
-	tmp_cap2 = ""
+	tmp_cap1 = "sizes	"
+	tmp_cap2 = "-----"
 	for g_index in cluster_groups_sampled:
 		if g_index == groups_number:
 			tmp_cap1 += "	other"
