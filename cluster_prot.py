@@ -2296,11 +2296,11 @@ def graph_xvg_groups():
 
 	return
 def write_xvg_groups_smoothed():											
-	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_4_plots_1D_smoothed/xvg/2_4_clusterprot_1D_smoothed.txt'
+	filename_txt = os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_3_plots_1D_smoothed/xvg/2_3_clusterprot_1D_smoothed.txt'
 	output_txt = open(filename_txt, 'w')
 	output_txt.write("@[peptides clustering statistics - written by cluster_prot v" + str(version_nb) + "]\n")
-	output_txt.write("@Use this file as the argument of the -c option of the script 'xvg_animate' in order to make a time lapse movie of the data in 2_4_clusterprot_1D_smoothed.xvg.\n")
-	filename_xvg=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_4_plots_1D_smoothed/xvg/2_4_clusterprot_1D_smoothed.xvg'
+	output_txt.write("@Use this file as the argument of the -c option of the script 'xvg_animate' in order to make a time lapse movie of the data in 2_3_clusterprot_1D_smoothed.xvg.\n")
+	filename_xvg=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_3_plots_1D_smoothed/xvg/2_3_clusterprot_1D_smoothed.xvg'
 	output_xvg = open(filename_xvg, 'w')
 	output_xvg.write("# [protein aggregation statistics - written by cluster_prot v" + str(version_nb) + "]\n")
 	output_xvg.write("# - proteins detected: " + str(proteins_nb) + "\n")
@@ -2323,12 +2323,12 @@ def write_xvg_groups_smoothed():
 	for c_index in range(0,len(cluster_TM_groups_sampled)):
 		g_index = cluster_TM_groups_sampled[c_index]
 		output_xvg.write("@ s" + str(c_index) + " legend \"% " + str(groups_labels[g_index]) + "\"\n")
-		output_txt.write("2_4_clusterprot_1D_smoothed.xvg," + str(c_index+1) + ",% " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex((colours_groups_dict[g_index])) + "\n")
+		output_txt.write("2_3_clusterprot_1D_smoothed.xvg," + str(c_index+1) + ",% " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex((colours_groups_dict[g_index])) + "\n")
 	#write caption: nb
 	for c_index in range(0,len(cluster_TM_groups_sampled)):
 		g_index = cluster_TM_groups_sampled[c_index]
 		output_xvg.write("@ s" + str(len(cluster_TM_groups_sampled) + c_index) + " legend \"nb " + str(groups_labels[g_index]) + "\"\n")
-		output_txt.write("2_4_clusterprot_1D_smoothed.xvg," + str(len(cluster_TM_groups_sampled) + c_index + 1) + ",nb " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_groups_dict[g_index])) + "\n")
+		output_txt.write("2_3_clusterprot_1D_smoothed.xvg," + str(len(cluster_TM_groups_sampled) + c_index + 1) + ",nb " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_groups_dict[g_index])) + "\n")
 	output_txt.close()
 	#write results
 	for f_index in range(0, len(time_smoothed)):
