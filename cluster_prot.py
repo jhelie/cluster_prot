@@ -870,7 +870,7 @@ def initialise_groups():												#DONE
 
 	colormaps_possible = ['Spectral', 'summer', 'coolwarm', 'pink_r', 'Set1', 'Set2', 'Set3', 'brg_r', 'Dark2', 'hot', 'PuOr_r', 'afmhot_r', 'terrain_r', 'PuBuGn_r', 'RdPu', 'gist_ncar_r', 'gist_yarg_r', 'Dark2_r', 'YlGnBu', 'RdYlBu', 'hot_r', 'gist_rainbow_r', 'gist_stern', 'gnuplot_r', 'cool_r', 'cool', 'gray', 'copper_r', 'Greens_r', 'GnBu', 'gist_ncar', 'spring_r', 'gist_rainbow', 'RdYlBu_r', 'gist_heat_r', 'OrRd_r', 'CMRmap', 'bone', 'gist_stern_r', 'RdYlGn', 'Pastel2_r', 'spring', 'terrain', 'YlOrRd_r', 'Set2_r', 'winter_r', 'PuBu', 'RdGy_r', 'spectral', 'flag_r', 'jet_r', 'RdPu_r', 'Purples_r', 'gist_yarg', 'BuGn', 'Paired_r', 'hsv_r', 'bwr', 'cubehelix', 'YlOrRd', 'Greens', 'PRGn', 'gist_heat', 'spectral_r', 'Paired', 'hsv', 'Oranges_r', 'prism_r', 'Pastel2', 'Pastel1_r', 'Pastel1', 'gray_r', 'PuRd_r', 'Spectral_r', 'gnuplot2_r', 'BuPu', 'YlGnBu_r', 'copper', 'gist_earth_r', 'Set3_r', 'OrRd', 'PuBu_r', 'ocean_r', 'brg', 'gnuplot2', 'jet', 'bone_r', 'gist_earth', 'Oranges', 'RdYlGn_r', 'PiYG', 'CMRmap_r', 'YlGn', 'binary_r', 'gist_gray_r', 'Accent', 'BuPu_r', 'gist_gray', 'flag', 'seismic_r', 'RdBu_r', 'BrBG', 'Reds', 'BuGn_r', 'summer_r', 'GnBu_r', 'BrBG_r', 'Reds_r', 'RdGy', 'PuRd', 'Accent_r', 'Blues', 'Greys', 'autumn', 'cubehelix_r', 'nipy_spectral_r', 'PRGn_r', 'Greys_r', 'pink', 'binary', 'winter', 'gnuplot', 'RdBu', 'prism', 'YlOrBr', 'coolwarm_r', 'rainbow_r', 'rainbow', 'PiYG_r', 'YlGn_r', 'Blues_r', 'YlOrBr_r', 'seismic', 'Purples', 'bwr_r', 'autumn_r', 'ocean', 'Set1_r', 'PuOr', 'PuBuGn', 'nipy_spectral', 'afmhot']
 
-	global colours_groups
+	global colours_groups_dict
 	global colours_groups_list
 	global groups_labels
 	global groups_number
@@ -905,7 +905,7 @@ def initialise_groups():												#DONE
 		if l_content[2] not in colormaps_possible:	
 			colours_groups_list.append(groups_colors_value[g_index])
 		if tmp_end == "max":
-			tmp_end = 100000										#put a stupidly big size to cap the open ended group
+			tmp_end = 100000											#put a stupidly big size to cap the open ended group
 		else:
 			tmp_end = int(tmp_end)
 		groups_boundaries[g_index] = [tmp_beg,tmp_end]
@@ -2234,7 +2234,7 @@ def graph_xvg_groups():
 
 	#create figure
 	#-------------
-	fig = plt.figure(figgroup=(8, 6.2))
+	fig = plt.figure(figsize=(8, 6.2))
 	fig.suptitle("Evolution of proteins distribution")
 		
 	#plot data: %
@@ -2243,11 +2243,11 @@ def graph_xvg_groups():
 	p_upper = {}
 	for c_group in cluster_groups_sampled:
 		p_upper[c_group] = plt.plot(frames_time, cluster_groups_pc[c_group], color = colours_groups_dict[c_group], linewidth = 2.0, label = str(c_group))
-	fontP.set_group("small")
+	fontP.set_size("small")
 	ax1.legend(prop=fontP)
-	plt.title("%", fontgroup="small")
-	plt.xlabel('time (ns)', fontgroup="small")
-	plt.ylabel('% of proteins', fontgroup="small")
+	plt.title("%", fontsize="small")
+	plt.xlabel('time (ns)', fontsize="small")
+	plt.ylabel('% of proteins', fontsize="small")
 
 	#plot data: nb
 	#-------------
@@ -2255,16 +2255,16 @@ def graph_xvg_groups():
 	p_lower = {}
 	for c_group in cluster_groups_sampled:
 		p_lower[c_group] = plt.plot(frames_time, cluster_groups_nb[c_group], color = colours_groups_dict[c_group], linewidth = 2.0, label=str(c_group))
-	fontP.set_group("small")
+	fontP.set_size("small")
 	ax2.legend(prop=fontP)
-	plt.title("nb", fontgroup="small")
-	plt.xlabel('time (ns)', fontgroup="small")
-	plt.ylabel('nb of clusters', fontgroup="small")
+	plt.title("nb", fontsize="small")
+	plt.xlabel('time (ns)', fontsize="small")
+	plt.ylabel('nb of clusters', fontsize="small")
 
 	#save figure
 	#-----------
 	ax1.set_ylim(0, 100)
-	ax2.set_ylim(0, max(max(cluster_groups_nb.values()))+1)
+	ax2.set_ylim(0, np.max(cluster_groups_nb.values())+1)
 	ax1.spines['top'].set_visible(False)
 	ax1.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
@@ -2277,10 +2277,10 @@ def graph_xvg_groups():
 	ax1.yaxis.set_major_locator(MaxNLocator(nbins=5))
 	ax2.xaxis.set_major_locator(MaxNLocator(nbins=5))
 	ax2.yaxis.set_major_locator(MaxNLocator(nbins=5))
-	plt.setp(ax1.xaxis.get_majorticklabels(), fontgroup="small" )
-	plt.setp(ax1.yaxis.get_majorticklabels(), fontgroup="small" )
-	plt.setp(ax2.xaxis.get_majorticklabels(), fontgroup="small" )
-	plt.setp(ax2.yaxis.get_majorticklabels(), fontgroup="small" )	
+	plt.setp(ax1.xaxis.get_majorticklabels(), fontsize="small" )
+	plt.setp(ax1.yaxis.get_majorticklabels(), fontsize="small" )
+	plt.setp(ax2.xaxis.get_majorticklabels(), fontsize="small" )
+	plt.setp(ax2.yaxis.get_majorticklabels(), fontsize="small" )	
 	plt.subplots_adjust(top=0.9, bottom=0.07, hspace=0.37, left=0.09, right=0.96)
 	fig.savefig(filename_png)
 	fig.savefig(filename_svg)
@@ -2365,7 +2365,7 @@ def graph_xvg_groups_smoothed():
 	#save figure
 	#-----------
 	ax1.set_ylim(0, 100)
-	ax2.set_ylim(0, max(max(cluster_sizes_nb_smoothed.values()))+1)
+	ax2.set_ylim(0, np.max(cluster_sizes_nb_smoothed.values())+1)
 	ax1.xaxis.set_major_locator(MaxNLocator(nbins=5))
 	ax1.yaxis.set_major_locator(MaxNLocator(nbins=5))
 	ax2.xaxis.set_major_locator(MaxNLocator(nbins=5))
