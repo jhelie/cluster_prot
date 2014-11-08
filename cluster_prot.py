@@ -2,7 +2,7 @@
 import argparse
 import operator
 from operator import itemgetter
-import sys, os, shutil
+import sys, os, shutil, itertools
 import os.path
 
 ################################################################################################################################################
@@ -559,8 +559,7 @@ def load_MDA_universe():												#DONE
 		U_timestep = U.trajectory.dt
 		all_atoms = U.selectAtoms("all")
 		nb_atoms = all_atoms.numberOfAtoms()
-		nb_frames_xtc = U.trajectory.numframes
-		U.trajectory.rewind()
+		nb_frames_xtc = U.trajectory.numframes		
 		#sanity check
 		if U.trajectory[nb_frames_xtc-1].time/float(1000) < args.t_start:
 			print "Error: the trajectory duration (" + str(U.trajectory.time/float(1000)) + "ns) is shorted than the starting stime specified (" + str(args.t_start) + "ns)."
@@ -568,6 +567,9 @@ def load_MDA_universe():												#DONE
 		if U.trajectory.numframes < args.frames_dt:
 			print "Warning: the trajectory contains fewer frames (" + str(nb_frames_xtc) + ") than the frame step specified (" + str(args.frames_dt) + ")."
 
+		#rewind traj (very important to make sure that later the 1st frame of the xtc will be used for leaflet identification)
+		U.trajectory.rewind()
+		
 		#create list of index of frames to process
 		if args.t_end != -1:
 			f_end = int((args.t_end*1000 - U.trajectory[0].time) / float(U_timestep))
@@ -575,7 +577,7 @@ def load_MDA_universe():												#DONE
 				print "Error: the starting time specified is before the beginning of the xtc."
 				sys.exit(1)
 		else:
-			f_end = nb_frames_xtc - 1
+			f_end = nb_frames_xtc - 1		
 		if args.t_start != -1:
 			f_start = int((args.t_start*1000 - U.trajectory[0].time) / float(U_timestep))
 			if f_start > f_end:
@@ -2681,13 +2683,13 @@ def write_frame_stat(f_nb, f_index, f_t):								#DONE
 			tmp_cap1 = "cluster_group"
 			tmp_cap2 = "-----------"
 			tmp_res = "% proteins"
-			for c_group in cluster_groups_sampled:
-				tmp_cap1 += "	" + str(c_group)
+			for g_index in cluster_groups_sampled:
+				tmp_cap1 += "	" + str(g_index)
 				tmp_cap2 += "--------"
 			output_stat.write(tmp_cap1 + "\n")
 			output_stat.write(tmp_cap2 + "\n")
-			for c_group in cluster_groups_sampled:		
-				tmp_res += "	" + str(round(groups_pc[c_group][f_index],1))
+			for g_index in cluster_groups_sampled:		
+				tmp_res += "	" + str(round(cluster_groups_pc[g_index][f_index],1))
 			output_stat.write(tmp_res + "\n")		
 			output_stat.close()
 
@@ -2824,7 +2826,7 @@ def write_xtc_annotation(action):										#DONE
 				#output VMD protein selection line
 				for p_index in range(0,proteins_nb):
 					tmp_prot_sele += "." + proteins_sele_string_VMD[p_index]
-				output_stat.write(tmp_prot_sele[1:] + "\n")
+				f.write(tmp_prot_sele[1:] + "\n")
 				#ouput min and max size
 				f.write(str(min(cluster_groups_sampled)) + "." + str(max(cluster_groups_sampled)) + "\n")
 				#write data
@@ -2996,10 +2998,10 @@ else:
 			write_xvg_cluster_mostrep_smoothed()
 			graph_xvg_cluster_mostrep_smoothed()
 		if args.cluster_groups_file != "no":
-			graph_aggregation_2D_groups()
-			write_stability_groups()
 			write_xvg_groups()
 			graph_xvg_groups()
+			graph_aggregation_2D_groups()
+			write_stability_groups()
 			if args.nb_smoothing > 1:
 				write_xvg_groups_smoothed()
 				graph_xvg_groups_smoothed()
