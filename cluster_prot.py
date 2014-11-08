@@ -1260,7 +1260,10 @@ def get_sizes_sampled():												#DONE
 		cluster_TM_groups_sampled = np.unique(proteins_cluster_status_groups)
 		cluster_TM_groups_sampled = cluster_TM_groups_sampled[cluster_TM_groups_sampled != -1]
 		cluster_TM_groups_sampled = cluster_TM_groups_sampled[cluster_TM_groups_sampled != 99999]
-		cluster_TM_groups_sampled = sorted(cluster_TM_groups_sampled)
+		cluster_TM_groups_sampled = sorted(cluster_TM_groups_sampled)		
+		if groups_number in cluster_TM_groups_sampled:
+			colours_groups_dict[groups_number] = colour_group_other
+			colours_groups_list.append(colour_group_other)
 
 	return
 def update_color_dict():												#DONE
@@ -1370,6 +1373,8 @@ def smooth_data():														#DONE
 	global frames_time_smoothed
 	global cluster_sizes_nb_smoothed
 	global cluster_sizes_pc_smoothed
+	global cluster_groups_nb_smoothed
+	global cluster_groups_pc_smoothed
 	global cluster_biggest_nb_smoothed
 	global cluster_biggest_pc_smoothed	
 	global cluster_biggest_size_smoothed
@@ -1379,6 +1384,8 @@ def smooth_data():														#DONE
 		
 	cluster_sizes_nb_smoothed = {}
 	cluster_sizes_pc_smoothed = {}
+	cluster_groups_nb_smoothed = {}
+	cluster_groups_pc_smoothed = {}
 
 	#time
 	frames_time_smoothed = rolling_avg(frames_time)
@@ -1630,7 +1637,7 @@ def write_xvg_cluster_biggest_smoothed():
 	output_txt.write("1_3_clusterprot_cluster_biggest_smooth.xvg,1,size,k\n")
 	output_txt.write("1_3_clusterprot_cluster_biggest_smooth.xvg,2,%,c\n")
 	output_txt.write("1_3_clusterprot_cluster_biggest_smooth.xvg,3,nb,r\n")
-	for f_index in range(0, frames_time_smoothed):
+	for f_index in range(0, len(frames_time_smoothed)):
 		results = str(frames_time_smoothed[f_index]) + "	" + str(cluster_biggest_size_smoothed[f_index]) + "	" + str(round(cluster_biggest_pc_smoothed[f_index],2)) + "	" + str(cluster_biggest_nb_smoothed[f_index])
 		output_xvg.write(results + "\n")
 	output_xvg.close()
@@ -1658,7 +1665,7 @@ def write_xvg_cluster_mostrep_smoothed():
 	output_txt.write("1_3_clusterprot_cluster_mostrep_smooth.xvg,1,size,k\n")
 	output_txt.write("1_3_clusterprot_cluster_mostrep_smooth.xvg,2,%,c\n")
 	output_txt.write("1_3_clusterprot_cluster_mostrep_smooth.xvg,3,nb,r\n")
-	for f_index in range(0, frames_time_smoothed):
+	for f_index in range(0, len(frames_time_smoothed)):
 		results = str(frames_time_smoothed[f_index]) + "	" + str(cluster_mostrep_size_smoothed[f_index]) + "	" + str(round(cluster_mostrep_pc_smoothed[f_index],2)) + "	" + str(cluster_mostrep_nb_smoothed[f_index])
 		output_xvg.write(results + "\n")
 	output_xvg.close()
@@ -1746,7 +1753,7 @@ def graph_xvg_cluster_mostrep_smoothed():
 	ax2 = fig.add_subplot(212)
 	p_lower = {}
 	p_lower["pc"] = plt.plot(frames_time_smoothed, cluster_mostrep_pc_smoothed, color = 'c', linewidth = 2.0, label = "% of proteins")
-	#p_lower["nb"] = plt.plot(time_smoothed, cluster_mostrep_nb_smoothed, color='r', linewidth=2.0, label="nb of clusters")
+	#p_lower["nb"] = plt.plot(frames_time_smoothed, cluster_mostrep_nb_smoothed, color='r', linewidth=2.0, label="nb of clusters")
 	fontP.set_size("small")
 	ax2.legend(prop=fontP)
 	plt.xlabel('time (ns)', fontsize="small")
@@ -2031,7 +2038,7 @@ def write_xvg_sizes_smoothed():
 		output_txt.write("1_4_clusterprot_1D_smoothed.xvg," + str(len(cluster_sizes_sampled) + c_index + 1) + ",nb " + str(c_size) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_sizes_dict[c_size])) + "\n")
 	output_txt.close()
 	#write results
-	for f_index in range(0, len(time_smoothed)):
+	for f_index in range(0, len(frames_time_smoothed)):
 		results = str(frames_time_smoothed[f_index])
 		for c_size in cluster_sizes_sampled:
 			results += "	" + str(round(cluster_sizes_pc_smoothed[c_size][f_index],2))
@@ -2207,16 +2214,17 @@ def write_xvg_groups():
 	output_xvg.write("@ legend loctype view\n")
 	output_xvg.write("@ legend 0.98, 0.8\n")
 	output_xvg.write("@ legend length " + str(len(cluster_TM_groups_sampled)*2) + "\n")
+		
 	#write caption: %
 	for c_index in range(0,len(cluster_TM_groups_sampled)):
-		g_index = cluster_TM_groups_sampled[c_index]
+		g_index = cluster_TM_groups_sampled[c_index]		
 		output_xvg.write("@ s" + str(c_index) + " legend \"% " + str(groups_labels[g_index]) + "\"\n")
 		output_txt.write("1_2_clusterprot_1D.xvg," + str(c_index+1) + ",% " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_groups_dict[g_index])) + "\n")
 	#write caption: nb
 	for c_index in range(0,len(cluster_TM_groups_sampled)):
 		g_index = cluster_TM_groups_sampled[c_index]
 		output_xvg.write("@ s" + str(len(cluster_TM_groups_sampled) + c_index) + " legend \"nb " + str(groups_labels[g_index]) + "\"\n")
-		output_txt.write("1_2_clusterprot_1D.xvg," + str(len(cluster_TM_groups_sampled) + c_index + 1) + ",nb " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex((colours_groups_dict[g_index])) + "\n")
+		output_txt.write("1_2_clusterprot_1D.xvg," + str(len(cluster_TM_groups_sampled) + c_index + 1) + ",nb " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_groups_dict[g_index])) + "\n")
 	output_txt.close()
 	#write results
 	for f_index in range(0,nb_frames_to_process):
@@ -2398,9 +2406,6 @@ def graph_aggregation_2D_groups():										#TO CHECK
 	filename_svg=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_1_plots_2D//2_1_clusterprot_2D.svg'
 
 	#build color map
-	if groups_number in cluster_TM_groups_sampled:						#proteins in cluster of a different size		
-		colours_groups_dict[groups_number] = colour_group_other
-		colours_groups_list.append(colour_group_other)
 	color_map = mcolors.LinearSegmentedColormap.from_list('custom', colours_groups_list, len(colours_groups_list))
 	if args.cutoff_leaflet != "no":
 		colours_groups_list.insert(0, colour_leaflet_lower)				#interfacial proteins on the lower leaflet (prepend -> bottom of colour bar)
