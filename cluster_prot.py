@@ -2331,7 +2331,7 @@ def write_xvg_groups_smoothed():
 		output_txt.write("2_3_clusterprot_1D_smoothed.xvg," + str(len(cluster_TM_groups_sampled) + c_index + 1) + ",nb " + str(groups_labels[g_index]) + "," + mcolors.rgb2hex(mcolorconv.to_rgb(colours_groups_dict[g_index])) + "\n")
 	output_txt.close()
 	#write results
-	for f_index in range(0, len(time_smoothed)):
+	for f_index in range(0, len(frames_time_smoothed)):
 		results = str(frames_time_smoothed[f_index])
 		for g_index in cluster_TM_groups_sampled:
 			results += "	" + str(round(cluster_groups_pc_smoothed[g_index][f_index],2))
@@ -2345,8 +2345,8 @@ def graph_xvg_groups_smoothed():
 	
 	#create filenames
 	#----------------
-	filename_png=os.getcwd() + '/' + str(args.output_folder) + '/1_groups/1_4_plots_1D_smoothed/png/1_4_clusterprot_1D_smoothed.png'
-	filename_svg=os.getcwd() + '/' + str(args.output_folder) + '/1_groups/1_4_plots_1D_smoothed/1_4_clusterprot_1D_smoothed.svg'
+	filename_png=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_3_plots_1D_smoothed/png/2_3_clusterprot_1D_smoothed.png'
+	filename_svg=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_3_plots_1D_smoothed/2_3_clusterprot_1D_smoothed.svg'
 
 	#create figure
 	#-------------
@@ -2398,8 +2398,8 @@ def graph_xvg_groups_smoothed():
 def graph_aggregation_2D_groups():										#TO CHECK
 	
 	#create filenames
-	filename_png=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_1_plots_2D//png/2_1_clusterprot_2D.png'
-	filename_svg=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_1_plots_2D//2_1_clusterprot_2D.svg'
+	filename_png=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_1_plots_2D/png/2_1_clusterprot_2D.png'
+	filename_svg=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_1_plots_2D/2_1_clusterprot_2D.svg'
 
 	#build color map
 	color_map = mcolors.LinearSegmentedColormap.from_list('custom', colours_groups_list, len(colours_groups_list))
