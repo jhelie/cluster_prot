@@ -2210,13 +2210,7 @@ def write_xvg_groups():
 	output_xvg.write("@ legend box on\n")
 	output_xvg.write("@ legend loctype view\n")
 	output_xvg.write("@ legend 0.98, 0.8\n")
-	output_xvg.write("@ legend length " + str(len(cluster_TM_groups_sampled)*2) + "\n")
-		
-	#debug
-	print groups_labels
-	print colours_groups_dict
-	print cluster_TM_groups_sampled
-	
+	output_xvg.write("@ legend length " + str(len(cluster_TM_groups_sampled)*2) + "\n")	
 	#write caption: %
 	for c_index in range(0,len(cluster_TM_groups_sampled)):
 		g_index = cluster_TM_groups_sampled[c_index]		
