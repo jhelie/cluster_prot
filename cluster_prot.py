@@ -976,7 +976,6 @@ def initialise_groups():												#DONE
 	groups_labels[groups_number] = "other"
 	groups_labels[groups_number+1] = "lower"
 	groups_labels[groups_number+2] = "upper"
-	colours_groups_dict[groups_number] = colour_group_other
 		
 	return
 
@@ -1286,19 +1285,6 @@ def update_color_dict():												#DONE
 		colours_sizes_dict[c_size] = colours_sizes_dict[colours_sizes_range[0]]
 	for c_size in range(colours_sizes_range[1]+1,proteins_nb+1):
 		colours_sizes_dict[c_size] = colours_sizes_dict[colours_sizes_range[1]]
-
-	#colours: groups
-	#-------
-	if args.cluster_groups_file != "no":
-		global colours_groups_nb
-		colours_groups_nb = len(cluster_groups_sampled)
-		#proteins in cluster of a different size		
-		if groups_number in cluster_groups_sampled:
-			colours_groups_list.append(colour_group_other)
-		#interfacial proteins on the lower leaflet (prepend -> bottom of colour bar)
-		colours_groups_list.insert(0, colour_leaflet_lower)
-		#interfacial proteins on the upper leaflet (append -> top of colour bar)
-		colours_groups_list.append(colour_leaflet_upper)
 
 	return
 def calculate_statistics():												#DONE
@@ -2395,7 +2381,6 @@ def graph_xvg_groups_smoothed():
 	plt.close()
 
 	return
-
 def graph_aggregation_2D_groups():										#TO CHECK
 	
 	#create filenames
@@ -2403,12 +2388,16 @@ def graph_aggregation_2D_groups():										#TO CHECK
 	filename_svg=os.getcwd() + '/' + str(args.output_folder) + '/2_groups/2_1_plots_2D//2_1_clusterprot_2D.svg'
 
 	#build color map
-	color_map=mcolors.LinearSegmentedColormap.from_list('custom', colours_groups_list, colours_groups_nb)
+	if groups_number in cluster_groups_sampled:						#proteins in cluster of a different size		
+		colours_groups_dict[groups_number] = colour_group_other
+		colours_groups_list.append(colour_group_other)
+	color_map = mcolors.LinearSegmentedColormap.from_list('custom', colours_groups_list, len(colours_groups_list))
+	if args.cutoff_leaflet != "no":
+		colours_groups_list.insert(0, colour_leaflet_lower)				#interfacial proteins on the lower leaflet (prepend -> bottom of colour bar)
+		colours_groups_list.append(colour_leaflet_upper)				#interfacial proteins on the upper leaflet (append -> top of colour bar)
+		color_map.set_under(colour_leaflet_lower)
+		color_map.set_over(colour_leaflet_upper)
 
-	#set colours for surfacic peptide
-	color_map.set_under(colour_leaflet_lower)
-	color_map.set_over(colour_leaflet_upper)
-	
 	#determine nb of colours and their boundaries
 	bounds = []
 	cb_ticks_lab = []
@@ -2425,14 +2414,12 @@ def graph_aggregation_2D_groups():										#TO CHECK
 	if args.cutoff_leaflet != "no":
 		cb_ticks_lab.append("upper")
 	bounds.append(sorted(colours_groups_dict.iterkeys())[-1]+0.5)
-	norm=mpl.colors.BoundaryNorm(bounds, color_map.N)
-				
+	norm = mpl.colors.BoundaryNorm(bounds, color_map.N)
+					
 	#create figure ('norm' requires at least 2 elements to work)
 	fig = plt.figure(figsize=(9, 8))
 	ax_plot = fig.add_axes([0.10, 0.1, 0.75, 0.77])	
-	#ax_plot.matshow(proteins_cluster_status_groups, origin = 'lower', interpolation = 'nearest', cmap = color_map, aspect = 'auto', norm = norm)
-	ax_plot.matshow(proteins_cluster_status_groups, origin = 'lower')
-	
+	ax_plot.matshow(proteins_cluster_status_groups, origin = 'lower', interpolation = 'nearest', cmap = color_map, aspect = 'auto', norm = norm)
 
 	#create color bar
 	ax_cbar=fig.add_axes([0.88, 0.1, 0.025, 0.77])
@@ -2477,7 +2464,6 @@ def graph_aggregation_2D_groups():										#TO CHECK
 	ax_plot.set_ylabel("protein #", fontsize = "medium")
 	ax_plot.yaxis.set_major_locator(MaxNLocator(prune = 'lower'))	
 	plt.setp(ax_plot.yaxis.get_majorticklabels(), fontsize = "small" )
-	
 	ax_plot.set_title("Evolution of the cluster size in which proteins are involved", fontsize = "medium")
 	ax_cbar.set_ylabel('cluster size', fontsize = 'small')
 	
