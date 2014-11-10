@@ -167,8 +167,9 @@ The following python modules are needed :
     the colour map (this is because the script does eveything in one pass and cannot guess
     what the cluster sizes will be in advance).
      -> '--colours_sizes 2,6'
-    Cluster sizes below the range will use the same colour as that of the lower size and
-    those above the range will use the same colour as that of the upper size.
+    
+    WARNING: cluster sizes outside the specified size range will use the same colours as
+    that associated to interfacial peptides!
 
     Exact colour control can be achieved by using size groups (see note 4), so if you want
     to control individual cluster sizes colours just specify the relevant group file.
@@ -232,7 +233,6 @@ parser.add_argument('--flipflops', nargs=1, dest='selection_file_ff', default=['
 parser.add_argument('--leaflets', nargs=1, dest='cutoff_leaflet', default=['optimise'], help=argparse.SUPPRESS)
 
 #protein clusters identification
-
 parser.add_argument('--groups', nargs=1, dest='cluster_groups_file', default=['no'], help=argparse.SUPPRESS)
 parser.add_argument('--proteins', nargs=1, dest='selection_file_prot', default=['auto'], help=argparse.SUPPRESS)
 parser.add_argument('--colours_sizes', nargs=1, dest='colours_sizes', default=['1,9'], help=argparse.SUPPRESS)
@@ -2109,8 +2109,9 @@ def graph_aggregation_2D_sizes():
 	color_map = mcolors.LinearSegmentedColormap.from_list('custom', colours_sizes_list, colours_sizes_nb)
 
 	#set colours for surfacic peptide
-	color_map.set_under(colour_leaflet_lower)
-	color_map.set_over(colour_leaflet_upper)
+	if args.cutoff_leaflet != "no":
+		color_map.set_under(colour_leaflet_lower)
+		color_map.set_over(colour_leaflet_upper)
 	
 	#determine nb of colours and their boundaries
 	bounds = []
