@@ -12,7 +12,7 @@ import os.path
 #=========================================================================================
 # create parser
 #=========================================================================================
-version_nb = "0.1.4"
+version_nb = "0.1.5"
 parser = argparse.ArgumentParser(prog='cluster_prot', usage='', add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description=\
 '''
 **********************************************
@@ -1104,14 +1104,23 @@ def detect_clusters_density(dist, box_dim):								#DONE
 			groups.append(map(lambda p:p[0] , tmp_pos))
 
 	return groups
-def process_clusters(clusters, f_index):								#DONE
+def process_clusters(clusters, f_index, f_nb):								#DONE
 
 	global vmd_cluster_size
+	
+	c_counter = 0
 	
 	#case: store cluster size only
 	#-----------------------------
 	if args.cluster_groups_file == "no":
 		for cluster in clusters:
+			#display update
+			c_counter += 1
+			progress = '\r -processing frame ' + str(f_nb+1) + '/' + str(nb_frames_to_process) + ' (every ' + str(args.frames_dt) + ' from ' + str(f_start) + ' to ' + str(f_end) + ' out of ' + str(nb_frames_xtc) + ') and cluster ' + str(c_counter) + '/' + str(nb_clusters) + '              '
+			sys.stdout.flush()
+			sys.stdout.write(progress)
+
+			#get size
 			c_size = np.size(cluster)
 			proteins_cluster_status_sizes[cluster, f_index] = c_size
 
@@ -1119,6 +1128,13 @@ def process_clusters(clusters, f_index):								#DONE
 	#---------------------------------------
 	else:
 		for cluster in clusters:
+			#display update
+			c_counter += 1
+			progress = '\r -processing frame ' + str(f_nb+1) + '/' + str(nb_frames_to_process) + ' (every ' + str(args.frames_dt) + ' from ' + str(f_start) + ' to ' + str(f_end) + ' out of ' + str(nb_frames_xtc) + ') and cluster ' + str(c_counter) + '/' + str(nb_clusters) + '              '
+			sys.stdout.flush()
+			sys.stdout.write(progress)
+
+			#get size and group
 			c_size = np.size(cluster)
 			g_index = groups_sizes_dict[c_size]
 			proteins_cluster_status_sizes[cluster, f_index] = c_size
@@ -1150,16 +1166,24 @@ def process_clusters(clusters, f_index):								#DONE
 					vmd_cluster_group = ""
 
 	return
-def process_clusters_TM(clusters, f_index, box_dim):					#DONE
+def process_clusters_TM(clusters, f_index, box_dim, f_nb):					#DONE
 
 	global vmd_cluster_size
 		
+	c_counter = 0
 	tmp_lip_coords = {l: leaflet_sele[l].coordinates() for l in ["lower","upper"]}
 	
 	#case: store cluster size only
 	#-----------------------------
 	if args.cluster_groups_file == "no":			
 		for cluster in clusters:
+			#display update
+			c_counter += 1
+			progress = '\r -processing frame ' + str(f_nb+1) + '/' + str(nb_frames_to_process) + ' (every ' + str(args.frames_dt) + ' from ' + str(f_start) + ' to ' + str(f_end) + ' out of ' + str(nb_frames_xtc) + ') and cluster ' + str(c_counter) + '/' + str(nb_clusters) + '              '
+			sys.stdout.flush()
+			sys.stdout.write(progress)
+
+			#get size and group
 			c_size = np.size(cluster)
 
 			#create selection for current cluster
@@ -1180,12 +1204,19 @@ def process_clusters_TM(clusters, f_index, box_dim):					#DONE
 				proteins_cluster_status_sizes[cluster, f_index] = 99999
 			#case: TM
 			else:
-				proteins_cluster_status_sizes[cluster, f_index] = c_size				
+				proteins_cluster_status_sizes[cluster, f_index] = c_size
 
 	#case: store cluster size and group size
 	#---------------------------------------
 	else:
 		for cluster in clusters:
+			#display update
+			c_counter += 1
+			progress = '\r -processing frame ' + str(f_nb+1) + '/' + str(nb_frames_to_process) + ' (every ' + str(args.frames_dt) + ' from ' + str(f_start) + ' to ' + str(f_end) + ' out of ' + str(nb_frames_xtc) + ') and cluster ' + str(c_counter) + '/' + str(nb_clusters) + '              '
+			sys.stdout.flush()
+			sys.stdout.write(progress)
+
+			#get size and group
 			c_size = np.size(cluster)
 			g_index = groups_sizes_dict[c_size]
 
@@ -2918,12 +2949,8 @@ if args.xtcfilename == "no":
 #==============
 else:
 	for f_index in range(0,nb_frames_to_process):
-		ts = U.trajectory[frames_to_process[f_index]]
-		progress = '\r -processing frame ' + str(f_index+1) + '/' + str(nb_frames_to_process) + ' (every ' + str(args.frames_dt) + ' frame(s) from frame ' + str(f_start) + ' to frame ' + str(f_end) + ' out of ' + str(nb_frames_xtc) + ')      '  
-		sys.stdout.flush()
-		sys.stdout.write(progress)
-
 		#frame properties
+		ts = U.trajectory[frames_to_process[f_index]]
 		f_time = ts.time/float(1000)
 		f_nb = ts.frame
 		frames_nb[f_index] = f_nb
@@ -2934,16 +2961,16 @@ else:
 		#detect clusters
 		#---------------
 		if args.m_algorithm != "density":
-			clusters = detect_clusters_connectivity(get_distances(U.trajectory.ts.dimensions), box_dim)
+			clusters = detect_clusters_connectivity(get_distances(box_dim), box_dim)
 		else:
-			clusters = detect_clusters_density(get_distances(U.trajectory.ts.dimensions), box_dim)
+			clusters = detect_clusters_density(get_distances(box_dim), box_dim)
 		
 		#assign current cluster status
 		#-----------------------------
 		if args.cutoff_leaflet == "no":
-			process_clusters(clusters, f_index)
+			process_clusters(clusters, f_index, f_nb)
 		else:
-			process_clusters_TM(clusters, f_index, box_dim)
+			process_clusters_TM(clusters, f_index, box_dim, f_nb)
 			
 		#output results
 		#--------------
