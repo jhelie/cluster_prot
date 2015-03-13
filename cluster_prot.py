@@ -2932,20 +2932,21 @@ print "\nDetecting proteins clusters..."
 if args.xtcfilename == "no":
 	frames_nb[0] = 1
 	frames_time[0] = 0
+	box_dim = U.dimensions
 
 	#detect clusters
 	#---------------
 	if args.m_algorithm != "density":
-		clusters = detect_clusters_connectivity(get_distances(U.trajectory.ts.dimensions), U.dimensions)
+		clusters = detect_clusters_connectivity(get_distances(box_dim), box_dim)
 	else:
-		clusters = detect_clusters_density(get_distances(U.trajectory.ts.dimensions), U.dimensions)
+		clusters = detect_clusters_density(get_distances(box_dim), box_dim)
 	
 	#assign current cluster status
 	#-----------------------------
 	if args.cutoff_leaflet == "no":
-		process_clusters(clusters, 0)
+		process_clusters(clusters, 0, 1)
 	else:
-		process_clusters_TM(clusters, 0)
+		process_clusters_TM(clusters, 0, box_dim, 1)
 			
 #case: xtc file
 #==============
@@ -2970,9 +2971,9 @@ else:
 		#assign current cluster status
 		#-----------------------------
 		if args.cutoff_leaflet == "no":
-			process_clusters(clusters, f_index, f_nb)
+			process_clusters(clusters, f_index, f_index)
 		else:
-			process_clusters_TM(clusters, f_index, box_dim, f_nb)
+			process_clusters_TM(clusters, f_index, box_dim, f_index)
 			
 		#output results
 		#--------------
