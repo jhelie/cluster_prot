@@ -1108,6 +1108,7 @@ def process_clusters(clusters, f_index, f_nb):								#DONE
 
 	global vmd_cluster_size
 	
+	nb_clusters = len(clusters)
 	c_counter = 0
 	
 	#case: store cluster size only
@@ -1170,6 +1171,7 @@ def process_clusters_TM(clusters, f_index, box_dim, f_nb):					#DONE
 
 	global vmd_cluster_size
 		
+	nb_clusters = len(clusters)
 	c_counter = 0
 	tmp_lip_coords = {l: leaflet_sele[l].coordinates() for l in ["lower","upper"]}
 	
